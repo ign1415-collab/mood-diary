@@ -8,9 +8,9 @@
   --muted: #6e716d;
   --line: #a9aaa3;
   --paper: #fbfaf5;
-  --teal: #123f40;
-  --teal-soft: #e8efeb;
-  --accent: #a8734e;
+  --teal: #ff385c;
+  --teal-soft: #fff0f3;
+  --accent: #b91c47;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +19,7 @@ button, input, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
-  outline: 3px solid rgba(18, 63, 64, .28); outline-offset: 2px;
+  outline: 3px solid rgba(255, 56, 92, .28); outline-offset: 2px;
 }
 
 .app-shell {
@@ -106,7 +106,7 @@ textarea::placeholder { color: #777b76; }
   min-height: 44px; padding: 0 18px; border-radius: 9px; font-size: 13px; font-weight: 800; cursor: pointer;
 }
 .primary-button { color: white; border: 1px solid var(--teal); background: var(--teal); }
-.primary-button:hover { background: #0b3031; }
+.primary-button:hover { background: #e31c5f; }
 
 .analysis-card { padding: 28px; }
 .analysis-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
