@@ -1,0 +1,27 @@
+{
+  "name": "mood-diary-basic",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"node --watch server/index.js\" \"vite\"",
+    "build": "tsc -b && vite build",
+    "start": "node server/index.js",
+    "test": "node --test server/**/*.test.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "supertest": "^7.1.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7"
+  }
+}
