@@ -1,6 +1,6 @@
 # MOOD DIARY
 
-하루에 한 번 네 가지 감정 중 하나와 100자 이내의 짧은 메모를 기록하고, 월간 달력과 분석 탭에서 돌아보는 개인용 로컬 웹서비스입니다. 기록은 외부로 전송되지 않습니다.
+Google 계정으로 로그인해 하루에 한 번 네 가지 감정 중 하나와 100자 이내의 메모를 기록하는 웹서비스입니다. 기록은 사용자별로 분리되어 Cloud Firestore 서울 리전에 저장됩니다.
 
 ## 실행 방법
 
@@ -11,9 +11,7 @@ npm install
 npm run dev
 ```
 
-브라우저에서 `http://localhost:5173`을 엽니다. 개발 서버를 종료하려면 터미널에서 `Ctrl+C`를 누릅니다.
-
-완성된 버전을 실행하려면 다음 명령을 사용합니다.
+개발 화면은 `http://localhost:5173`에서 열립니다. 완성된 빌드를 로컬에서 실행하려면 다음 명령을 사용합니다.
 
 ```powershell
 npm run build
@@ -22,18 +20,44 @@ npm start
 
 그다음 `http://localhost:3001`을 엽니다.
 
-## 데이터와 백업
+## Firebase 구성
 
-- SQLite 데이터 파일: `data/mood-diary.sqlite`
-- 화면 오른쪽 위의 톱니바퀴를 눌러 설정으로 이동한 뒤 **백업 내려받기**로 전체 기록을 JSON 파일로 저장할 수 있습니다.
-- **백업 복원**은 현재 기록을 백업 파일의 내용으로 교체합니다. 교체 전 확인 창이 표시되며, 파일 검증에 실패하면 기존 기록은 변경되지 않습니다.
-- `data` 폴더의 SQLite 파일은 Git에 포함되지 않습니다.
+- 프로젝트: `mood-diary-ign1415`
+- 인증: 모든 Google 계정
+- 데이터베이스: Cloud Firestore, `asia-northeast3`(서울), 무료 Spark 요금제
+- 데이터 경로: `users/{uid}/diaries/{generationId}/entries/{YYYY-MM-DD}`
+- 실제 연결 정보는 Git에 포함되지 않는 `.env.local`에 저장됩니다.
+- 새 PC에서는 `.env.example`을 `.env.local`로 복사한 뒤 Firebase 웹앱 설정값을 입력합니다.
+- `firestore.rules`는 로그인한 사용자가 자신의 UID 경로에만 접근하도록 제한합니다.
+
+## 날씨 구성
+
+상단 날씨는 브라우저에서 허용한 현재 위치를 사용해 OpenWeatherMap의 현재 날씨를 표시합니다. `.env.local`에 아래 항목을 추가한 뒤 앱을 다시 실행합니다.
+
+```text
+VITE_OPENWEATHERMAP_API_KEY=직접_발급받은_API_키
+```
+
+API 키는 로컬 빌드의 브라우저 코드에서 사용되므로 공개 웹 배포용 비밀 키 저장 방식은 아닙니다. 현재 위치는 날씨 조회를 위해 OpenWeatherMap으로 전송됩니다.
+날씨가 정상적으로 불러와진 상태에서 일기를 저장하면 당시의 지역명, 날씨, 기온과 아이콘도 해당 날짜 기록에 함께 저장됩니다.
+
+## 기록 저장
+
+- 이전 SQLite 파일 `data/mood-diary.sqlite`는 삭제하거나 Firebase로 이전하지 않습니다. 앱의 활성 데이터 저장에는 사용되지 않습니다.
 
 ## 명령어
 
 ```powershell
-npm run dev     # 개발 서버 실행
-npm run build   # 타입 검사 및 프런트엔드 빌드
-npm start       # 빌드된 로컬 서비스 실행
-npm test        # API와 데이터 복원 테스트
+npm run dev          # 개발 서버 실행
+npm run build        # 타입 검사 및 프런트엔드 빌드
+npm start            # 빌드된 로컬 서비스 실행
+npm test             # 날짜·입력·통계·백업 검증 테스트
+npm run test:rules   # Firestore 보안 규칙 테스트(Java 필요)
+npm run test:legacy  # 보존된 SQLite API 테스트
+```
+
+Firestore 규칙을 다시 배포하려면 Firebase CLI 로그인 후 아래 명령을 사용합니다.
+
+```powershell
+npx firebase-tools deploy --only firestore:rules --project mood-diary-ign1415
 ```

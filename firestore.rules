@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validEntry(entryId) {
+      return entryId.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.keys().hasOnly(['mood', 'note', 'weather', 'createdAt', 'updatedAt'])
+        && request.resource.data.mood in ['happy', 'neutral', 'depressed', 'angry']
+        && request.resource.data.note is string
+        && request.resource.data.note.size() <= 100
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.createdAt <= request.resource.data.updatedAt
+        && request.resource.data.updatedAt <= request.time
+        && (!request.resource.data.keys().hasAny(['weather']) || validWeather(request.resource.data.weather));
+    }
+
+    function validWeather(weather) {
+      return weather.keys().hasOnly(['icon', 'temperature', 'description', 'location', 'observedAt'])
+        && weather.icon is string
+        && weather.icon.size() <= 8
+        && weather.temperature is int
+        && weather.temperature >= -100
+        && weather.temperature <= 100
+        && weather.description is string
+        && weather.description.size() <= 100
+        && weather.location is string
+        && weather.location.size() <= 100
+        && weather.observedAt is timestamp
+        && weather.observedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow read: if signedInAs(userId);
+      allow create: if signedInAs(userId)
+        && request.resource.data.keys().hasOnly(['currentGeneration', 'createdAt', 'updatedAt'])
+        && request.resource.data.currentGeneration is string
+        && request.resource.data.currentGeneration.size() <= 100;
+      allow update: if signedInAs(userId)
+        && request.resource.data.keys().hasOnly(['currentGeneration', 'createdAt', 'updatedAt'])
+        && request.resource.data.currentGeneration is string
+        && request.resource.data.currentGeneration.size() <= 100
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      match /diaries/{generationId} {
+        allow read, delete: if signedInAs(userId);
+        allow create, update: if signedInAs(userId)
+          && generationId.size() <= 100
+          && request.resource.data.keys().hasOnly(['createdAt', 'restoredAt', 'count'])
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.restoredAt is timestamp
+          && request.resource.data.count is int
+          && request.resource.data.count >= 0;
+
+        match /entries/{entryId} {
+          allow read, delete: if signedInAs(userId);
+          allow create, update: if signedInAs(userId) && validEntry(entryId);
+        }
+      }
+    }
+  }
+}

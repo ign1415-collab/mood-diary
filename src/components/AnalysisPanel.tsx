@@ -73,6 +73,11 @@ export function AnalysisPanel({ days, analysis, loading, onDaysChange, onDelete 
             <article key={entry.date}>
               <div className="record-mood"><span aria-hidden="true">{entry.mood === 'happy' ? '😊' : entry.mood === 'neutral' ? '🙂' : entry.mood === 'depressed' ? '😔' : '😡'}</span><strong>{MOODS[entry.mood].label}</strong></div>
               <div className="record-actions">
+                {entry.weather && (
+                  <span className="record-weather" title={`${entry.weather.location} · ${entry.weather.description}`}>
+                    {entry.weather.icon} {entry.weather.temperature}°
+                  </span>
+                )}
                 <time dateTime={entry.date}>{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${entry.date}T00:00:00Z`))}</time>
                 <button type="button" className="more-button" aria-label={`${entry.date} 기록 메뉴`} aria-expanded={openMenu === entry.date} onClick={() => setOpenMenu(openMenu === entry.date ? null : entry.date)}>⋯</button>
                 {openMenu === entry.date && (

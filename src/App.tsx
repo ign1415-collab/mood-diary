@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from './api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createDiaryApi } from './api'
 import { AnalysisPanel } from './components/AnalysisPanel'
 import { Calendar } from './components/Calendar'
 import { EntryForm } from './components/EntryForm'
-import { SettingsPanel } from './components/SettingsPanel'
-import type { AnalysisResult, Entry, Mood } from './types'
+import { WeatherBadge } from './components/WeatherBadge'
+import type { AnalysisResult, Entry, Mood, WeatherSnapshot } from './types'
 
 function localDate() {
   const now = new Date()
@@ -13,7 +13,14 @@ function localDate() {
 
 type Notice = { kind: 'success' | 'error'; text: string } | null
 
-export default function App() {
+type AppProps = {
+  userId: string
+  userEmail: string
+  onSignOut: () => Promise<void> | undefined
+}
+
+export default function App({ userId, userEmail, onSignOut }: AppProps) {
+  const api = useMemo(() => createDiaryApi(userId), [userId])
   const today = localDate()
   const [selectedDate, setSelectedDate] = useState(today)
   const [month, setMonth] = useState(today.slice(0, 7))
@@ -24,9 +31,9 @@ export default function App() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
-  const [activeTab, setActiveTab] = useState<'home' | 'analysis' | 'settings'>('home')
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null)
+  const [activeTab, setActiveTab] = useState<'home' | 'analysis'>('home')
   const [noteClearKey, setNoteClearKey] = useState(0)
-  const importRef = useRef<HTMLInputElement>(null)
 
   const loadMonth = useCallback(async (targetMonth: string) => {
     setLoading(true)
@@ -37,7 +44,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [api])
 
   const loadAnalysis = useCallback(async (days: 7 | 30) => {
     setAnalysisLoading(true)
@@ -48,7 +55,7 @@ export default function App() {
     } finally {
       setAnalysisLoading(false)
     }
-  }, [])
+  }, [api])
 
   useEffect(() => { void loadMonth(month) }, [month, loadMonth])
   useEffect(() => {
@@ -72,7 +79,10 @@ export default function App() {
   async function save(value: { mood: Mood; note: string }) {
     setSaving(true)
     try {
-      await api.save(selectedDate, value)
+      const weatherToSave = selectedDate === today && !selectedEntry?.weather
+        ? weather ?? undefined
+        : undefined
+      await api.save(selectedDate, { ...value, weather: weatherToSave })
       await loadMonth(month)
       setNoteClearKey((key) => key + 1)
       setNotice({ kind: 'success', text: selectedEntry ? '수정한 마음을 저장했습니다.' : '오늘의 마음을 저장했습니다.' })
@@ -99,23 +109,6 @@ export default function App() {
     }
   }
 
-  async function importBackup(file: File) {
-    try {
-      const backup = JSON.parse(await file.text())
-      if (!window.confirm('백업을 복원하면 현재 기록 전체가 백업 내용으로 바뀝니다. 계속할까요?')) return
-      const result = await api.restore(backup)
-      await loadMonth(month)
-      setNotice({ kind: 'success', text: `${result.imported}개의 기록을 복원했습니다.` })
-    } catch (error) {
-      const message = error instanceof SyntaxError
-        ? 'JSON 파일 형식이 올바르지 않습니다.'
-        : error instanceof Error ? error.message : '백업을 복원하지 못했습니다.'
-      setNotice({ kind: 'error', text: message })
-    } finally {
-      if (importRef.current) importRef.current.value = ''
-    }
-  }
-
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -124,12 +117,9 @@ export default function App() {
         </div>
         <div className="header-tools">
           <span className="header-date">{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}</span>
-          <button type="button" className={`settings-button ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')} aria-label="설정 열기" aria-current={activeTab === 'settings' ? 'page' : undefined}>⚙</button>
+          <WeatherBadge onWeatherChange={setWeather} />
+          <button type="button" className="account-button" onClick={() => void onSignOut()} aria-label={`${userEmail} 계정에서 로그아웃`} title={`${userEmail} · 로그아웃`}>로그아웃</button>
         </div>
-        <input ref={importRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={(event) => {
-          const file = event.target.files?.[0]
-          if (file) void importBackup(file)
-        }} />
       </header>
 
       <main>
@@ -140,13 +130,9 @@ export default function App() {
               <EntryForm date={selectedDate} entry={selectedEntry} saving={saving} noteClearKey={noteClearKey} onSave={save} />
             </div>
           </div>
-        ) : activeTab === 'analysis' ? (
+        ) : (
           <div className="analysis-page">
             <AnalysisPanel days={analysisDays} analysis={analysis} loading={analysisLoading} onDaysChange={setAnalysisDays} onDelete={remove} />
-          </div>
-        ) : (
-          <div className="settings-page">
-            <SettingsPanel onRestore={() => importRef.current?.click()} />
           </div>
         )}
       </main>

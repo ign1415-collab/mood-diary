@@ -7,14 +7,18 @@
     "dev": "concurrently -k -n server,web -c blue,magenta \"node --watch server/index.js\" \"vite\"",
     "build": "tsc -b && vite build",
     "start": "node server/index.js",
-    "test": "node --test server/**/*.test.js"
+    "test": "node --experimental-strip-types --test tests/diary-logic.test.ts",
+    "test:legacy": "node --test server/**/*.test.js",
+    "test:rules": "npx --yes firebase-tools@latest emulators:exec --only firestore \"node --test tests/firestore-rules.test.js\""
   },
   "dependencies": {
     "express": "^5.1.0",
+    "firebase": "^12.19.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/express": "^5.0.3",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",

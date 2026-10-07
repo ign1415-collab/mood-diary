@@ -1,9 +1,18 @@
 export type Mood = 'happy' | 'neutral' | 'depressed' | 'angry'
 
+export interface WeatherSnapshot {
+  icon: string
+  temperature: number
+  description: string
+  location: string
+  observed_at: string
+}
+
 export interface Entry {
   date: string
   mood: Mood
   note: string
+  weather?: WeatherSnapshot
   created_at: string
   updated_at: string
 }
@@ -20,6 +29,12 @@ export interface Stats {
 
 export interface AnalysisResult extends Stats {
   days: 7 | 30
+  entries: Entry[]
+}
+
+export interface Backup {
+  schemaVersion: 2
+  exportedAt: string
   entries: Entry[]
 }
 

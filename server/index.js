@@ -2,12 +2,9 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
-import { createApp } from './app.js'
-import { createStore } from './store.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const store = createStore(path.join(root, 'data', 'mood-diary.sqlite'))
-const app = createApp(store)
+const app = express()
 const dist = path.join(root, 'dist')
 
 if (existsSync(dist)) {
@@ -22,7 +19,6 @@ const server = app.listen(port, '127.0.0.1', () => {
 
 function shutdown() {
   server.close(() => {
-    store.close()
     process.exit(0)
   })
 }

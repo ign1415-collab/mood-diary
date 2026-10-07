@@ -22,6 +22,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   outline: 3px solid rgba(255, 56, 92, .28); outline-offset: 2px;
 }
 
+.auth-shell {
+  min-height: 100vh; padding: 32px 16px; display: grid; place-items: center;
+}
+.auth-card {
+  width: min(440px, 100%); padding: 42px; border: 1px solid #c5c1b7; border-radius: 24px;
+  background: var(--paper); box-shadow: 0 18px 45px rgba(55, 52, 43, .08);
+}
+.auth-eyebrow { margin: 0 0 14px; font-size: 13px; font-weight: 800; letter-spacing: .12em; }
+.auth-card h1 { margin: 0; font-size: 30px; letter-spacing: -.045em; }
+.auth-description { margin: 12px 0 28px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.google-auth-button {
+  width: 100%; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 11px;
+  border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: white;
+  font-weight: 800; cursor: pointer;
+}
+.google-auth-button:hover:not(:disabled) { border-color: var(--teal); background: var(--teal-soft); }
+.google-auth-button:disabled { opacity: .62; cursor: wait; }
+.google-auth-button span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #4285f4; background: #f4f7ff; font-family: Arial, sans-serif; font-size: 16px; font-weight: 800; }
+.auth-error { margin: 14px 0 0; color: #a42d45; font-size: 13px; font-weight: 700; }
+.auth-privacy { margin: 26px 0 0; padding-top: 20px; border-top: 1px solid #dedbd2; color: var(--muted); text-align: center; font-size: 11px; }
+.auth-loading { min-height: 100vh; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+
 .app-shell {
   width: min(680px, calc(100% - 32px)); min-height: calc(100vh - 48px); margin: 24px auto;
   border: 1px solid #c5c1b7; border-radius: 28px; background: var(--paper);
@@ -36,8 +58,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .brand span { font-size: 42px; line-height: 1; font-weight: 800; letter-spacing: -.055em; }
 .header-tools { display: flex; align-items: center; gap: 12px; padding-top: 18px; }
 .header-date { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; }
-.settings-button { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; font-size: 20px; cursor: pointer; }
-.settings-button:hover, .settings-button.active { color: white; border-color: var(--teal); background: var(--teal); }
+.weather-button {
+  min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 18px;
+  background: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer;
+}
+.weather-button:hover:not(:disabled) { background: #efeee8; }
+.weather-button.ready { border-color: var(--line); background: #fff; }
+.weather-button:disabled { color: var(--muted); cursor: wait; }
+.account-button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 18px; background: #fff; font-size: 11px; font-weight: 800; cursor: pointer; }
+.account-button:hover { background: #efeee8; }
 
 main { padding: 8px 30px 22px; }
 .home-stack, .analysis-content { display: grid; gap: 16px; }
@@ -133,6 +162,7 @@ textarea::placeholder { color: #777b76; }
 .analysis-records article:last-child { border-bottom: 0; }
 .record-mood { display: flex; gap: 8px; align-items: center; }
 .record-actions { position: relative; display: flex; gap: 8px; align-items: center; }
+.record-weather { color: #4f534f; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .analysis-records time { color: var(--muted); font-size: 12px; }
 .analysis-records article p { grid-column: 1 / -1; margin: 3px 0 0; color: #4f534f; font-size: 13px; }
 .more-button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; }
@@ -173,11 +203,12 @@ textarea::placeholder { color: #777b76; }
 @media (max-width: 600px) {
   body { background: var(--paper); }
   .app-shell { width: 100%; min-height: 100vh; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-  .app-header { padding: 26px 20px 18px; }
+  .app-header { padding: 26px 20px 18px; flex-direction: column; gap: 18px; }
   .brand span { font-size: 34px; }
-  .header-tools { gap: 7px; padding-top: 13px; }
+  .header-tools { width: 100%; justify-content: space-between; gap: 8px; padding-top: 0; }
   .header-date { font-size: 13px; }
-  .settings-button { width: 38px; height: 38px; }
+  .weather-button { min-height: 34px; padding-inline: 10px; }
+  .account-button { padding-inline: 9px; }
   main { padding: 6px 16px 18px; }
   .calendar-card, .entry-card, .analysis-card, .settings-card { padding: 20px; }
   .calendar-card { padding-inline: 16px; }
@@ -192,8 +223,11 @@ textarea::placeholder { color: #777b76; }
 }
 
 @media (max-width: 390px) {
+  .auth-card { padding: 32px 24px; }
   .brand span { font-size: 30px; }
-  .header-date { font-size: 11px; }
+  .header-tools { gap: 5px; }
+  .header-date { font-size: 12px; }
+  .weather-button, .account-button { padding-inline: 8px; font-size: 11px; }
   .calendar-card, .entry-card, .analysis-card { padding-inline: 14px; }
   .mood-choice { padding-inline: 10px; }
 }
