@@ -35,7 +35,7 @@ export function validateEntry(value) {
   if (!value || typeof value !== 'object') return '기록 형식이 올바르지 않습니다.'
   if (!MOODS.includes(value.mood)) return '감정을 다시 선택해 주세요.'
   if (typeof value.note !== 'string') return '메모 형식이 올바르지 않습니다.'
-  if (value.note.length > 100) return '메모는 100자까지 입력할 수 있습니다.'
+  if (value.note.length > 300) return '메모는 300자까지 입력할 수 있습니다.'
   return null
 }
 

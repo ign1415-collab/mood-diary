@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { auth } from '../firebase'
 import type { WeatherSnapshot } from '../types'
 
 type WeatherState =
@@ -9,15 +10,13 @@ type WeatherState =
   | { status: 'api-error' }
 
 type OpenWeatherResponse = {
-  name?: string
-  main?: { temp?: number }
-  weather?: Array<{ id?: number; icon?: string; description?: string }>
+  temperature?: number
+  description?: string
+  location?: string
+  weatherId?: number
+  iconCode?: string
+  observedAt?: string
 }
-
-type ReverseGeocodeResult = Array<{
-  name?: string
-  local_names?: { ko?: string }
-}>
 
 function weatherEmoji(id: number, iconCode: string) {
   if (id >= 200 && id < 300) return '⛈️'
@@ -51,8 +50,8 @@ export function WeatherBadge({ onWeatherChange }: Props) {
   const [state, setState] = useState<WeatherState>({ status: 'loading' })
 
   const loadWeather = useCallback(async () => {
-    const apiKey = import.meta.env.VITE_OPENWEATHERMAP_API_KEY?.trim()
-    if (!apiKey) {
+    const endpoint = import.meta.env.VITE_WEATHER_API_URL?.trim()
+    if (!endpoint) {
       setState({ status: 'missing-key' })
       onWeatherChange(null)
       return
@@ -69,40 +68,27 @@ export function WeatherBadge({ onWeatherChange }: Props) {
     }
 
     try {
-      const params = new URLSearchParams({
-        lat: String(position.coords.latitude),
-        lon: String(position.coords.longitude),
-        appid: apiKey,
-        units: 'metric',
-        lang: 'kr',
+      const user = auth?.currentUser
+      if (!user) throw new Error('Firebase user is unavailable.')
+      const url = new URL(endpoint)
+      url.searchParams.set('lat', String(position.coords.latitude))
+      url.searchParams.set('lon', String(position.coords.longitude))
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` },
       })
-      const geocodeParams = new URLSearchParams({
-        lat: String(position.coords.latitude),
-        lon: String(position.coords.longitude),
-        limit: '1',
-        appid: apiKey,
-      })
-      const [response, geocodeResponse] = await Promise.all([
-        fetch(`https://api.openweathermap.org/data/2.5/weather?${params}`),
-        fetch(`https://api.openweathermap.org/geo/1.0/reverse?${geocodeParams}`),
-      ])
-      if (!response.ok) throw new Error(`OpenWeatherMap returned ${response.status}`)
+      if (!response.ok) throw new Error(`Weather worker returned ${response.status}`)
 
       const data = await response.json() as OpenWeatherResponse
-      const geocode = geocodeResponse.ok
-        ? await geocodeResponse.json() as ReverseGeocodeResult
-        : []
-      const condition = data.weather?.[0]
-      if (typeof data.main?.temp !== 'number' || typeof condition?.id !== 'number') {
+      if (typeof data.temperature !== 'number' || typeof data.weatherId !== 'number') {
         throw new Error('Weather response is incomplete.')
       }
 
       const weather: WeatherSnapshot = {
-        temperature: Math.round(data.main.temp),
-        description: condition.description ?? '현재 날씨',
-        location: geocode[0]?.local_names?.ko ?? geocode[0]?.name ?? data.name ?? '현재 위치',
-        icon: weatherEmoji(condition.id, condition.icon ?? ''),
-        observed_at: new Date().toISOString(),
+        temperature: data.temperature,
+        description: data.description ?? '현재 날씨',
+        location: data.location ?? '현재 위치',
+        icon: weatherEmoji(data.weatherId, data.iconCode ?? ''),
+        observed_at: data.observedAt ?? new Date().toISOString(),
       }
       setState({ status: 'ready', weather })
       onWeatherChange(weather)
@@ -127,11 +113,11 @@ export function WeatherBadge({ onWeatherChange }: Props) {
   const title = state.status === 'ready'
     ? `${state.weather.location} · ${state.weather.description} · ${state.weather.temperature}°C · 눌러서 새로고침`
     : state.status === 'missing-key'
-      ? '.env.local에 OpenWeatherMap API 키를 입력해 주세요.'
+      ? '날씨 서버 주소가 설정되지 않았습니다.'
       : state.status === 'location-error'
         ? '현재 날씨를 보려면 위치 권한을 허용해 주세요.'
         : state.status === 'api-error'
-          ? '날씨를 불러오지 못했습니다. API 키와 네트워크를 확인해 주세요.'
+          ? '날씨를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
           : '현재 위치의 날씨를 불러오는 중입니다.'
 
   return (

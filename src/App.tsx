@@ -4,6 +4,7 @@ import { AnalysisPanel } from './components/AnalysisPanel'
 import { Calendar } from './components/Calendar'
 import { EntryForm } from './components/EntryForm'
 import { WeatherBadge } from './components/WeatherBadge'
+import { DiaryLogo } from './components/DiaryLogo'
 import type { AnalysisResult, Entry, Mood, WeatherSnapshot } from './types'
 
 function localDate() {
@@ -109,16 +110,36 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
     }
   }
 
+  async function updateFromAnalysis(date: string, value: { mood: Mood; note: string }) {
+    setSaving(true)
+    try {
+      await api.save(date, value)
+      await Promise.all([loadAnalysis(analysisDays), loadMonth(month)])
+      setNotice({ kind: 'success', text: '수정한 마음을 저장했습니다.' })
+      return true
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : '수정하지 못했습니다.' })
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
+          <DiaryLogo className="brand-logo" />
           <div><strong>MOOD DIARY</strong><span>감정 기록</span></div>
         </div>
-        <div className="header-tools">
-          <span className="header-date">{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}</span>
-          <WeatherBadge onWeatherChange={setWeather} />
-          <button type="button" className="account-button" onClick={() => void onSignOut()} aria-label={`${userEmail} 계정에서 로그아웃`} title={`${userEmail} · 로그아웃`}>로그아웃</button>
+        <div className="header-info">
+          <div className="header-actions">
+            <button type="button" className="account-button" onClick={() => void onSignOut()} aria-label={`${userEmail} 계정에서 로그아웃`} title={`${userEmail} · 로그아웃`}>로그아웃</button>
+          </div>
+          <div className="header-context">
+            <span className="header-date">{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}</span>
+            <WeatherBadge onWeatherChange={setWeather} />
+          </div>
         </div>
       </header>
 
@@ -127,12 +148,12 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
           <div className="home-page">
             <div className="home-stack">
               <Calendar month={month} entries={entries} selectedDate={selectedDate} today={today} onMonthChange={setMonth} onSelect={selectDate} />
-              <EntryForm date={selectedDate} today={today} entry={selectedEntry} saving={saving} noteClearKey={noteClearKey} onSave={save} />
+              <EntryForm date={selectedDate} entry={selectedEntry} saving={saving} noteClearKey={noteClearKey} onSave={save} />
             </div>
           </div>
         ) : (
           <div className="analysis-page">
-            <AnalysisPanel days={analysisDays} analysis={analysis} loading={analysisLoading} onDaysChange={setAnalysisDays} onDelete={remove} />
+            <AnalysisPanel days={analysisDays} analysis={analysis} loading={analysisLoading} saving={saving} onDaysChange={setAnalysisDays} onUpdate={updateFromAnalysis} onDelete={remove} />
           </div>
         )}
       </main>

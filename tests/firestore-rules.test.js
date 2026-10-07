@@ -49,7 +49,7 @@ describe('Firestore 사용자별 보안 규칙', () => {
     await assertFails(setDoc(doc(bob, 'users/alice/diaries/main/entries/2026-10-01'), entry()))
   })
 
-  test('잘못된 감정과 100자를 넘는 메모를 거부한다', async () => {
+  test('잘못된 감정과 300자를 넘는 메모를 거부한다', async () => {
     const alice = environment.authenticatedContext('alice').firestore()
     await assertFails(setDoc(
       doc(alice, 'users/alice/diaries/main/entries/2026-10-01'),
@@ -57,7 +57,7 @@ describe('Firestore 사용자별 보안 규칙', () => {
     ))
     await assertFails(setDoc(
       doc(alice, 'users/alice/diaries/main/entries/2026-10-02'),
-      entry({ note: '가'.repeat(101) }),
+      entry({ note: '가'.repeat(301) }),
     ))
   })
 

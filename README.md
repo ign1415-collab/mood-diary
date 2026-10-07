@@ -1,6 +1,6 @@
 # MOOD DIARY
 
-Google 계정으로 로그인해 하루에 한 번 네 가지 감정 중 하나와 100자 이내의 메모를 기록하는 웹서비스입니다. 기록은 사용자별로 분리되어 Cloud Firestore 서울 리전에 저장됩니다.
+Google 계정으로 로그인해 하루에 한 번 네 가지 감정 중 하나와 300자 이내의 메모를 기록하는 웹서비스입니다. 기록은 사용자별로 분리되어 Cloud Firestore 서울 리전에 저장됩니다.
 
 ## 실행 방법
 
@@ -32,14 +32,20 @@ npm start
 
 ## 날씨 구성
 
-상단 날씨는 브라우저에서 허용한 현재 위치를 사용해 OpenWeatherMap의 현재 날씨를 표시합니다. `.env.local`에 아래 항목을 추가한 뒤 앱을 다시 실행합니다.
+상단 날씨는 브라우저에서 허용한 현재 위치를 사용해 OpenWeatherMap의 현재 날씨를 표시합니다. 브라우저는 OpenWeatherMap을 직접 호출하지 않고 Cloudflare Worker를 사용하므로 API 키가 공개되지 않습니다. `.env.local`에는 공개 가능한 Worker 주소만 설정합니다.
 
 ```text
-VITE_OPENWEATHERMAP_API_KEY=직접_발급받은_API_키
+VITE_WEATHER_API_URL=https://mood-diary-weather.계정.workers.dev/weather
 ```
 
-API 키는 로컬 빌드의 브라우저 코드에서 사용되므로 공개 웹 배포용 비밀 키 저장 방식은 아닙니다. 현재 위치는 날씨 조회를 위해 OpenWeatherMap으로 전송됩니다.
+OpenWeatherMap 키는 Cloudflare의 `OPENWEATHER_API_KEY` Secret에, Firebase 웹 API 키는 Worker의 `FIREBASE_API_KEY` Secret에 저장합니다. 현재 위치는 날씨 조회를 위해 Cloudflare Worker와 OpenWeatherMap으로 전송됩니다.
 날씨가 정상적으로 불러와진 상태에서 일기를 저장하면 당시의 지역명, 날씨, 기온과 아이콘도 해당 날짜 기록에 함께 저장됩니다.
+
+```powershell
+npx wrangler secret put OPENWEATHER_API_KEY --config worker/wrangler.toml
+npx wrangler secret put FIREBASE_API_KEY --config worker/wrangler.toml
+npm run worker:deploy
+```
 
 ## 기록 저장
 

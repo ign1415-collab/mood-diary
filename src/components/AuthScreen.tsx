@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { useEffect, useState } from 'react'
+import { getRedirectResult, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from 'firebase/auth'
 import { auth, isFirebaseConfigured } from '../firebase'
+import { DiaryLogo } from './DiaryLogo'
 
 function authErrorMessage(error: unknown) {
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
@@ -18,6 +19,14 @@ export function AuthScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    if (!auth) return
+    void getRedirectResult(auth).catch((caught) => {
+      setSubmitting(false)
+      setError(authErrorMessage(caught))
+    })
+  }, [])
+
   async function signInWithGoogle() {
     if (!auth) return
     setSubmitting(true)
@@ -25,7 +34,11 @@ export function AuthScreen() {
     try {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
-      await signInWithPopup(auth, provider)
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        await signInWithPopup(auth, provider)
+      } else {
+        await signInWithRedirect(auth, provider)
+      }
     } catch (caught) {
       setError(authErrorMessage(caught))
     } finally {
@@ -48,9 +61,12 @@ export function AuthScreen() {
   return (
     <div className="auth-shell">
       <section className="auth-card" aria-labelledby="auth-title">
-        <p className="auth-eyebrow">MOOD DIARY</p>
-        <h1 id="auth-title">다시 만나 반가워요</h1>
-        <p className="auth-description">내 감정을 기록하려면 Google 계정으로 로그인해 주세요.</p>
+        <div className="auth-brand">
+          <DiaryLogo className="auth-logo" />
+          <h1 id="auth-title">MOOD DIARY</h1>
+        </div>
+        <p className="auth-welcome">오늘의 마음을 기록해 보세요</p>
+        <p className="auth-description">Google 계정으로 로그인하고 나만의 감정 기록을 시작해 보세요.</p>
 
         <button type="button" className="google-auth-button" onClick={() => void signInWithGoogle()} disabled={submitting}>
           <span aria-hidden="true">G</span>
@@ -58,7 +74,7 @@ export function AuthScreen() {
         </button>
 
         {error && <p className="auth-error" role="alert">{error}</p>}
-        <p className="auth-privacy">감정 기록은 로그인한 계정에 안전하게 분리되어 저장됩니다.</p>
+        <p className="auth-privacy"><span aria-hidden="true">🔒</span> 내 기록은 로그인한 계정에만 안전하게 저장돼요.</p>
       </section>
     </div>
   )

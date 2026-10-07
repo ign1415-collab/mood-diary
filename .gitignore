@@ -1,8 +1,10 @@
 node_modules/
 dist/
+.firebase/
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
 *.log
 .env.local
+worker/.dev.vars
 .DS_Store

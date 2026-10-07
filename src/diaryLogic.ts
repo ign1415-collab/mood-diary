@@ -1,6 +1,7 @@
 import type { Backup, Entry, Mood, Stats, WeatherSnapshot } from './types'
 
 export const MOOD_VALUES: Mood[] = ['happy', 'neutral', 'depressed', 'angry']
+export const MAX_NOTE_LENGTH = 300
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MONTH_RE = /^\d{4}-\d{2}$/
 
@@ -36,7 +37,7 @@ export function validateEntry(value: unknown) {
   const entry = value as { mood?: unknown; note?: unknown; weather?: unknown }
   if (!MOOD_VALUES.includes(entry.mood as Mood)) return '감정을 다시 선택해 주세요.'
   if (typeof entry.note !== 'string') return '메모 형식이 올바르지 않습니다.'
-  if (entry.note.length > 100) return '메모는 100자까지 입력할 수 있습니다.'
+  if (entry.note.length > MAX_NOTE_LENGTH) return `메모는 ${MAX_NOTE_LENGTH}자까지 입력할 수 있습니다.`
   if (entry.weather !== undefined && !isValidWeather(entry.weather)) return '날씨 정보 형식이 올바르지 않습니다.'
   return null
 }

@@ -12,10 +12,10 @@ describe('감정 기록 검증', () => {
     assert.equal(monthAfter('2025-12'), '2026-01')
   })
 
-  test('감정 값과 메모 100자 제한을 확인한다', () => {
-    assert.equal(validateEntry({ mood: 'happy', note: '가'.repeat(100) }), null)
+  test('감정 값과 메모 300자 제한을 확인한다', () => {
+    assert.equal(validateEntry({ mood: 'happy', note: '가'.repeat(300) }), null)
     assert.match(validateEntry({ mood: 'excited', note: '' }) ?? '', /감정/)
-    assert.match(validateEntry({ mood: 'happy', note: '가'.repeat(101) }) ?? '', /100자/)
+    assert.match(validateEntry({ mood: 'happy', note: '가'.repeat(301) }) ?? '', /300자/)
     assert.equal(validateEntry({
       mood: 'happy',
       note: '',
@@ -46,7 +46,7 @@ describe('감정 기록 검증', () => {
     assert.throws(() => validateBackup({ schemaVersion: 2, entries: [entry, entry] }), /중복/)
     assert.throws(() => validateBackup({
       schemaVersion: 2,
-      entries: [{ ...entry, note: '가'.repeat(101) }],
-    }), /100자/)
+      entries: [{ ...entry, note: '가'.repeat(301) }],
+    }), /300자/)
   })
 })

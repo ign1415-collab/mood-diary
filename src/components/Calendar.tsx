@@ -38,8 +38,8 @@ export function Calendar({ month, entries, selectedDate, today, onMonthChange, o
           <h2 id="calendar-title">{title}</h2>
         </div>
         <div className="month-nav" aria-label="월 이동">
-          <button type="button" className="icon-button" onClick={() => onMonthChange(shiftMonth(month, -1))} aria-label="이전 달">‹</button>
-          <button type="button" className="icon-button" onClick={() => onMonthChange(shiftMonth(month, 1))} disabled={month >= currentMonth} aria-label="다음 달">›</button>
+          <button type="button" className="icon-button previous" onClick={() => onMonthChange(shiftMonth(month, -1))} aria-label="이전 달" />
+          <button type="button" className="icon-button next" onClick={() => onMonthChange(shiftMonth(month, 1))} disabled={month >= currentMonth} aria-label="다음 달" />
         </div>
       </div>
       <div className="calendar-grid weekdays" aria-hidden="true">
@@ -69,8 +69,8 @@ export function Calendar({ month, entries, selectedDate, today, onMonthChange, o
         })}
       </div>
       <div className="calendar-legend" aria-label="달력 표시 안내">
-        <span><i className="today-legend" />오늘 날짜</span>
         <span><i className="selected-legend" />선택한 날짜</span>
+        <span><i className="today-legend" />오늘 날짜</span>
       </div>
     </section>
   )

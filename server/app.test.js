@@ -26,7 +26,7 @@ describe('감정 일기 API', () => {
 
   test('잘못된 감정, 긴 메모, 미래 날짜를 거부한다', async () => {
     await request(app).put('/api/entries/2025-01-02').send({ mood: 'excited', note: '' }).expect(400)
-    await request(app).put('/api/entries/2025-01-02').send({ mood: 'happy', note: '가'.repeat(101) }).expect(400)
+    await request(app).put('/api/entries/2025-01-02').send({ mood: 'happy', note: '가'.repeat(301) }).expect(400)
     await request(app).put('/api/entries/2999-01-01').send({ mood: 'happy', note: '' }).expect(400)
   })
 
@@ -80,7 +80,7 @@ describe('감정 일기 API', () => {
       schemaVersion: 1,
       entries: [
         { date: '2025-04-05', mood: 'happy', note: '', created_at: '2025-04-05T00:00:00Z', updated_at: '2025-04-05T00:00:00Z' },
-        { date: '2025-04-06', mood: 'angry', note: '가'.repeat(101), created_at: '2025-04-05T00:00:00Z', updated_at: '2025-04-05T00:00:00Z' },
+        { date: '2025-04-06', mood: 'angry', note: '가'.repeat(301), created_at: '2025-04-05T00:00:00Z', updated_at: '2025-04-05T00:00:00Z' },
       ],
     }
     await request(app).post('/api/import').send(invalidBackup).expect(400)
