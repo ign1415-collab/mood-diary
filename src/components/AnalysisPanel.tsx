@@ -74,8 +74,8 @@ export function AnalysisPanel({ days, analysis, loading, onDaysChange, onDelete 
               <div className="record-mood"><span aria-hidden="true">{entry.mood === 'happy' ? '😊' : entry.mood === 'neutral' ? '🙂' : entry.mood === 'depressed' ? '😔' : '😡'}</span><strong>{MOODS[entry.mood].label}</strong></div>
               <div className="record-actions">
                 {entry.weather && (
-                  <span className="record-weather" title={`${entry.weather.location} · ${entry.weather.description}`}>
-                    {entry.weather.icon} {entry.weather.temperature}°
+                  <span className="record-weather" title={entry.weather.location ? `${entry.weather.location} · ${entry.weather.description}` : entry.weather.description}>
+                    {entry.weather.icon}{entry.weather.temperature !== undefined ? ` ${entry.weather.temperature}°` : ''}
                   </span>
                 )}
                 <time dateTime={entry.date}>{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${entry.date}T00:00:00Z`))}</time>

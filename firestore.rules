@@ -21,17 +21,24 @@ service cloud.firestore {
 
     function validWeather(weather) {
       return weather.keys().hasOnly(['icon', 'temperature', 'description', 'location', 'observedAt'])
+        && weather.keys().hasAll(['icon', 'description'])
         && weather.icon is string
         && weather.icon.size() <= 8
-        && weather.temperature is int
-        && weather.temperature >= -100
-        && weather.temperature <= 100
         && weather.description is string
         && weather.description.size() <= 100
-        && weather.location is string
-        && weather.location.size() <= 100
-        && weather.observedAt is timestamp
-        && weather.observedAt <= request.time;
+        && (
+          !weather.keys().hasAny(['temperature', 'location', 'observedAt'])
+          || (
+            weather.keys().hasAll(['temperature', 'location', 'observedAt'])
+            && weather.temperature is int
+            && weather.temperature >= -100
+            && weather.temperature <= 100
+            && weather.location is string
+            && weather.location.size() <= 100
+            && weather.observedAt is timestamp
+            && weather.observedAt <= request.time
+          )
+        );
     }
 
     match /users/{userId} {

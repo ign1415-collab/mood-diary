@@ -30,12 +30,14 @@ function requireDb() {
 function entryFromDocument(id: string, data: DocumentData): Entry {
   const weather = data.weather && typeof data.weather === 'object' ? {
     icon: data.weather.icon,
-    temperature: data.weather.temperature,
     description: data.weather.description,
-    location: data.weather.location,
-    observed_at: data.weather.observedAt instanceof Timestamp
-      ? data.weather.observedAt.toDate().toISOString()
-      : new Date(data.weather.observedAt).toISOString(),
+    ...(typeof data.weather.temperature === 'number' ? { temperature: data.weather.temperature } : {}),
+    ...(typeof data.weather.location === 'string' ? { location: data.weather.location } : {}),
+    ...(data.weather.observedAt ? {
+      observed_at: data.weather.observedAt instanceof Timestamp
+        ? data.weather.observedAt.toDate().toISOString()
+        : new Date(data.weather.observedAt).toISOString(),
+    } : {}),
   } satisfies WeatherSnapshot : undefined
   return {
     date: id,
@@ -128,10 +130,10 @@ export function createDiaryApi(uid: string) {
         const previousWeather = snapshot.data()?.weather
         const weather = entry.weather ? {
           icon: entry.weather.icon,
-          temperature: entry.weather.temperature,
           description: entry.weather.description,
-          location: entry.weather.location,
-          observedAt: Timestamp.fromDate(new Date(entry.weather.observed_at)),
+          ...(entry.weather.temperature !== undefined ? { temperature: entry.weather.temperature } : {}),
+          ...(entry.weather.location ? { location: entry.weather.location } : {}),
+          ...(entry.weather.observed_at ? { observedAt: Timestamp.fromDate(new Date(entry.weather.observed_at)) } : {}),
         } : previousWeather
         transaction.set(entryRef, {
           mood: entry.mood,
@@ -182,10 +184,10 @@ export function createDiaryApi(uid: string) {
           for (const entry of backup.entries.slice(index, index + WRITE_BATCH_SIZE)) {
             const weather = entry.weather ? {
               icon: entry.weather.icon,
-              temperature: entry.weather.temperature,
               description: entry.weather.description,
-              location: entry.weather.location,
-              observedAt: Timestamp.fromDate(new Date(entry.weather.observed_at)),
+              ...(entry.weather.temperature !== undefined ? { temperature: entry.weather.temperature } : {}),
+              ...(entry.weather.location ? { location: entry.weather.location } : {}),
+              ...(entry.weather.observed_at ? { observedAt: Timestamp.fromDate(new Date(entry.weather.observed_at)) } : {}),
             } : undefined
             batch.set(doc(entriesRef(uid, nextGeneration), entry.date), {
               mood: entry.mood,

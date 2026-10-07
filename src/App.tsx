@@ -76,12 +76,12 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
     if (date.slice(0, 7) !== month) setMonth(date.slice(0, 7))
   }
 
-  async function save(value: { mood: Mood; note: string }) {
+  async function save(value: { mood: Mood; note: string; weather?: WeatherSnapshot }) {
     setSaving(true)
     try {
-      const weatherToSave = selectedDate === today && !selectedEntry?.weather
-        ? weather ?? undefined
-        : undefined
+      const weatherToSave = selectedDate === today
+        ? (!selectedEntry?.weather ? weather ?? undefined : undefined)
+        : value.weather
       await api.save(selectedDate, { ...value, weather: weatherToSave })
       await loadMonth(month)
       setNoteClearKey((key) => key + 1)
@@ -127,7 +127,7 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
           <div className="home-page">
             <div className="home-stack">
               <Calendar month={month} entries={entries} selectedDate={selectedDate} today={today} onMonthChange={setMonth} onSelect={selectDate} />
-              <EntryForm date={selectedDate} entry={selectedEntry} saving={saving} noteClearKey={noteClearKey} onSave={save} />
+              <EntryForm date={selectedDate} today={today} entry={selectedEntry} saving={saving} noteClearKey={noteClearKey} onSave={save} />
             </div>
           </div>
         ) : (

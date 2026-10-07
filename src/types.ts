@@ -2,10 +2,10 @@ export type Mood = 'happy' | 'neutral' | 'depressed' | 'angry'
 
 export interface WeatherSnapshot {
   icon: string
-  temperature: number
   description: string
-  location: string
-  observed_at: string
+  temperature?: number
+  location?: string
+  observed_at?: string
 }
 
 export interface Entry {

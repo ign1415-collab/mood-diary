@@ -122,6 +122,16 @@ fieldset { border: 0; margin: 0; padding: 0; }
 .mood-choice strong { font-size: 16px; }
 .mood-option:hover .mood-choice { border-color: var(--teal); }
 .mood-option input:checked + .mood-choice { color: var(--teal); background: var(--teal-soft); border-color: var(--teal); }
+.past-weather-fieldset { margin-top: 20px; }
+.past-weather-fieldset legend { margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.past-weather-fieldset legend span { margin-left: 5px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.past-weather-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.past-weather-options button {
+  min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 9px; background: #fff; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.past-weather-options button:hover { background: #efeee8; }
+.past-weather-options button.selected { color: var(--teal); border-color: var(--teal); background: var(--teal-soft); }
 .note-row { display: flex; align-items: baseline; justify-content: space-between; }
 .field-label { display: block; margin: 20px 0 9px; font-size: 13px; font-weight: 700; }
 .note-row span { color: #858782; font-size: 11px; }
@@ -230,6 +240,7 @@ textarea::placeholder { color: #777b76; }
   .weather-button, .account-button { padding-inline: 8px; font-size: 11px; }
   .calendar-card, .entry-card, .analysis-card { padding-inline: 14px; }
   .mood-choice { padding-inline: 10px; }
+  .past-weather-options { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

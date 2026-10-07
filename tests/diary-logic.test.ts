@@ -21,6 +21,7 @@ describe('감정 기록 검증', () => {
       note: '',
       weather: { icon: '☀️', temperature: 18, description: '맑음', location: '제기동', observed_at: timestamp },
     }), null)
+    assert.equal(validateEntry({ mood: 'happy', note: '', weather: { icon: '☁️', description: '흐림' } }), null)
     assert.match(validateEntry({
       mood: 'happy',
       note: '',

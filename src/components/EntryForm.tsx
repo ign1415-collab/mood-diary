@@ -1,22 +1,36 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { Entry, Mood } from '../types'
+import type { Entry, Mood, WeatherSnapshot } from '../types'
 import { MOODS } from '../types'
 
 interface Props {
   date: string
+  today: string
   entry?: Entry
   saving: boolean
   noteClearKey: number
-  onSave: (value: { mood: Mood; note: string }) => Promise<boolean>
+  onSave: (value: { mood: Mood; note: string; weather?: WeatherSnapshot }) => Promise<boolean>
 }
 
-export function EntryForm({ date, entry, saving, noteClearKey, onSave }: Props) {
+const PAST_WEATHER_OPTIONS: WeatherSnapshot[] = [
+  { icon: '☀️', description: '맑음' },
+  { icon: '☁️', description: '흐림' },
+  { icon: '🌧️', description: '비' },
+  { icon: '🌨️', description: '눈' },
+  { icon: '⛈️', description: '번개' },
+  { icon: '🌫️', description: '안개' },
+]
+
+export function EntryForm({ date, today, entry, saving, noteClearKey, onSave }: Props) {
   const [mood, setMood] = useState<Mood>('neutral')
   const [note, setNote] = useState('')
+  const [pastWeather, setPastWeather] = useState<WeatherSnapshot | undefined>()
+  const [weatherTouched, setWeatherTouched] = useState(false)
 
   useEffect(() => {
     setMood(entry?.mood ?? 'neutral')
     setNote('')
+    setPastWeather(entry?.weather && entry.weather.temperature === undefined ? entry.weather : undefined)
+    setWeatherTouched(false)
   }, [date, entry])
 
   useEffect(() => {
@@ -29,7 +43,11 @@ export function EntryForm({ date, entry, saving, noteClearKey, onSave }: Props) 
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const saved = await onSave({ mood, note })
+    const saved = await onSave({
+      mood,
+      note,
+      ...(weatherTouched && pastWeather ? { weather: pastWeather } : {}),
+    })
     if (saved) setNote('')
   }
 
@@ -57,6 +75,32 @@ export function EntryForm({ date, entry, saving, noteClearKey, onSave }: Props) 
             ))}
           </div>
         </fieldset>
+
+        {date < today && (
+          <fieldset className="past-weather-fieldset">
+            <legend>그날 날씨는 어땠나요? <span>선택 사항</span></legend>
+            <div className="past-weather-options">
+              {PAST_WEATHER_OPTIONS.map((option) => {
+                const selected = pastWeather?.description === option.description
+                return (
+                  <button
+                    type="button"
+                    key={option.description}
+                    className={selected ? 'selected' : ''}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setPastWeather(option)
+                      setWeatherTouched(true)
+                    }}
+                  >
+                    <span aria-hidden="true">{option.icon}</span>
+                    {option.description}
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+        )}
 
         <div className="note-row">
           <label className="field-label" htmlFor="note">짧은 메모</label>

@@ -44,12 +44,16 @@ export function validateEntry(value: unknown) {
 function isValidWeather(value: unknown): value is WeatherSnapshot {
   if (!value || typeof value !== 'object') return false
   const weather = value as Partial<WeatherSnapshot>
-  return typeof weather.icon === 'string' && weather.icon.length <= 8
-    && typeof weather.temperature === 'number' && Number.isInteger(weather.temperature)
+  const isManual = weather.temperature === undefined
+    && weather.location === undefined
+    && weather.observed_at === undefined
+  const isLive = typeof weather.temperature === 'number' && Number.isInteger(weather.temperature)
     && weather.temperature >= -100 && weather.temperature <= 100
-    && typeof weather.description === 'string' && weather.description.length <= 100
     && typeof weather.location === 'string' && weather.location.length <= 100
     && typeof weather.observed_at === 'string' && !Number.isNaN(Date.parse(weather.observed_at))
+  return typeof weather.icon === 'string' && weather.icon.length <= 8
+    && typeof weather.description === 'string' && weather.description.length <= 100
+    && (isManual || isLive)
 }
 
 export function validateBackup(value: unknown): Backup {
@@ -77,7 +81,7 @@ export function validateBackup(value: unknown): Backup {
       note: entry.note.trim(),
       ...(entry.weather ? { weather: {
         ...entry.weather,
-        observed_at: new Date(entry.weather.observed_at).toISOString(),
+        ...(entry.weather.observed_at ? { observed_at: new Date(entry.weather.observed_at).toISOString() } : {}),
       } } : {}),
       created_at: new Date(entry.created_at).toISOString(),
       updated_at: new Date(entry.updated_at).toISOString(),
