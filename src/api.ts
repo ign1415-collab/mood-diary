@@ -8,6 +8,7 @@ import {
   endBefore,
   getDoc,
   getDocs,
+  limit,
   orderBy,
   query,
   runTransaction,
@@ -17,8 +18,8 @@ import {
   type DocumentData,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { AnalysisResult, Backup, Entry, Mood, Stats, WeatherSnapshot } from './types'
-import { calculateStats, isValidDate, monthAfter, validateBackup, validateEntry } from './diaryLogic'
+import { DEFAULT_REASON_TAGS, type AnalysisResult, type Backup, type Entry, type Mood, type ReasonTag, type Stats, type WeatherSnapshot } from './types'
+import { calculateStats, isValidDate, MAX_REASON_LABEL_LENGTH, monthAfter, sevenDayComparison, validateBackup, validateEntry } from './diaryLogic'
 
 const WRITE_BATCH_SIZE = 400
 
@@ -43,7 +44,19 @@ function entryFromDocument(id: string, data: DocumentData): Entry {
     date: id,
     mood: data.mood as Mood,
     note: data.note,
+    ...(Array.isArray(data.reasonIds) ? { reason_ids: data.reasonIds.filter((value: unknown): value is string => typeof value === 'string') } : {}),
     weather,
+    created_at: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+    updated_at: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
+  }
+}
+
+function reasonTagFromDocument(id: string, data: DocumentData): ReasonTag {
+  return {
+    id,
+    label: data.label,
+    active: data.active,
+    built_in: data.builtIn,
     created_at: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
     updated_at: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : new Date(data.updatedAt).toISOString(),
   }
@@ -67,6 +80,26 @@ async function currentGeneration(uid: string) {
 
 function entriesRef(uid: string, generation: string) {
   return collection(requireDb(), 'users', uid, 'diaries', generation, 'entries')
+}
+
+function reasonTagsRef(uid: string) {
+  return collection(requireDb(), 'users', uid, 'reasonTags')
+}
+
+async function listReasonTags(uid: string) {
+  const result = await getDocs(query(reasonTagsRef(uid), orderBy(documentId())))
+  const stored = new Map(result.docs.map((snapshot) => [snapshot.id, reasonTagFromDocument(snapshot.id, snapshot.data())]))
+  const fallbackTimestamp = '1970-01-01T00:00:00.000Z'
+  const defaults = DEFAULT_REASON_TAGS.map(({ id, label }) => stored.get(id) ?? {
+    id,
+    label,
+    active: true,
+    built_in: true,
+    created_at: fallbackTimestamp,
+    updated_at: fallbackTimestamp,
+  })
+  const custom = [...stored.values()].filter((tag) => !DEFAULT_REASON_TAGS.some((item) => item.id === tag.id))
+  return [...defaults, ...custom]
 }
 
 async function listBetween(uid: string, start: string, endExclusive: string) {
@@ -93,6 +126,12 @@ async function deleteGeneration(uid: string, generation: string) {
 
 export function createDiaryApi(uid: string) {
   return {
+    async hasAnyEntries() {
+      const generation = await currentGeneration(uid)
+      const result = await getDocs(query(entriesRef(uid, generation), limit(1)))
+      return !result.empty
+    },
+
     async list(month: string) {
       return listBetween(uid, `${month}-01`, `${monthAfter(month)}-01`)
     },
@@ -105,7 +144,7 @@ export function createDiaryApi(uid: string) {
       const today = new Date()
       const end = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       const startDate = new Date(`${end}T00:00:00Z`)
-      startDate.setUTCDate(startDate.getUTCDate() - days + 1)
+      startDate.setUTCDate(startDate.getUTCDate() - (days === 7 ? 14 : days - 1))
       const start = startDate.toISOString().slice(0, 10)
       const generation = await currentGeneration(uid)
       const result = await getDocs(query(
@@ -114,11 +153,17 @@ export function createDiaryApi(uid: string) {
         startAt(start),
         endAt(end),
       ))
-      const entries = result.docs.map((snapshot) => entryFromDocument(snapshot.id, snapshot.data())).reverse()
-      return { days, ...calculateStats(entries), entries }
+      const pool = result.docs.map((snapshot) => entryFromDocument(snapshot.id, snapshot.data())).reverse()
+      const displayStart = new Date(`${end}T00:00:00Z`)
+      displayStart.setUTCDate(displayStart.getUTCDate() - days + 1)
+      const displayStartValue = displayStart.toISOString().slice(0, 10)
+      const entries = pool.filter((entry) => entry.date >= displayStartValue)
+      return days === 7
+        ? { days, ...calculateStats(entries), entries, comparison: sevenDayComparison(pool, end), comparison_pool: pool }
+        : { days, ...calculateStats(entries), entries }
     },
 
-    async save(date: string, entry: { mood: Mood; note: string; weather?: WeatherSnapshot }) {
+    async save(date: string, entry: { mood: Mood; note: string; reason_ids?: string[]; weather?: WeatherSnapshot }) {
       if (!isValidDate(date)) throw new Error('오늘 또는 과거 날짜를 선택해 주세요.')
       const validationError = validateEntry(entry)
       if (validationError) throw new Error(validationError)
@@ -128,6 +173,7 @@ export function createDiaryApi(uid: string) {
       await runTransaction(firestore, async (transaction) => {
         const snapshot = await transaction.get(entryRef)
         const previousWeather = snapshot.data()?.weather
+        const previousReasonIds = snapshot.data()?.reasonIds
         const weather = entry.weather ? {
           icon: entry.weather.icon,
           description: entry.weather.description,
@@ -138,6 +184,9 @@ export function createDiaryApi(uid: string) {
         transaction.set(entryRef, {
           mood: entry.mood,
           note: entry.note.trim(),
+          ...(entry.reason_ids !== undefined
+            ? { reasonIds: entry.reason_ids }
+            : Array.isArray(previousReasonIds) ? { reasonIds: previousReasonIds } : {}),
           ...(weather ? { weather } : {}),
           createdAt: snapshot.data()?.createdAt ?? serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -155,11 +204,15 @@ export function createDiaryApi(uid: string) {
 
     async exportBackup(): Promise<Backup> {
       const generation = await currentGeneration(uid)
-      const result = await getDocs(query(entriesRef(uid, generation), orderBy(documentId())))
+      const [result, reasonTags] = await Promise.all([
+        getDocs(query(entriesRef(uid, generation), orderBy(documentId()))),
+        listReasonTags(uid),
+      ])
       return {
-        schemaVersion: 2,
+        schemaVersion: 3,
         exportedAt: new Date().toISOString(),
         entries: result.docs.map((snapshot) => entryFromDocument(snapshot.id, snapshot.data())),
+        reason_tags: reasonTags,
       }
     },
 
@@ -192,6 +245,7 @@ export function createDiaryApi(uid: string) {
             batch.set(doc(entriesRef(uid, nextGeneration), entry.date), {
               mood: entry.mood,
               note: entry.note,
+              ...(entry.reason_ids ? { reasonIds: entry.reason_ids } : {}),
               ...(weather ? { weather } : {}),
               createdAt: Timestamp.fromDate(new Date(entry.created_at)),
               updatedAt: Timestamp.fromDate(new Date(entry.updated_at)),
@@ -208,6 +262,20 @@ export function createDiaryApi(uid: string) {
           }
           transaction.update(userRef, { currentGeneration: nextGeneration, updatedAt: serverTimestamp() })
         })
+
+        for (let index = 0; index < backup.reason_tags.length; index += WRITE_BATCH_SIZE) {
+          const batch = writeBatch(firestore)
+          for (const tag of backup.reason_tags.slice(index, index + WRITE_BATCH_SIZE)) {
+            batch.set(doc(reasonTagsRef(uid), tag.id), {
+              label: tag.label,
+              active: tag.active,
+              builtIn: tag.built_in,
+              createdAt: Timestamp.fromDate(new Date(tag.created_at)),
+              updatedAt: Timestamp.fromDate(new Date(tag.updated_at)),
+            })
+          }
+          await batch.commit()
+        }
       } catch (error) {
         void deleteGeneration(uid, nextGeneration)
         throw error
@@ -215,6 +283,50 @@ export function createDiaryApi(uid: string) {
 
       void deleteGeneration(uid, previousGeneration)
       return { imported: backup.entries.length }
+    },
+
+    async listReasonTags() {
+      return listReasonTags(uid)
+    },
+
+    async createReasonTag(label: string) {
+      const normalized = label.trim()
+      if (!normalized || normalized.length > MAX_REASON_LABEL_LENGTH) {
+        throw new Error(`이유 이름은 ${MAX_REASON_LABEL_LENGTH}자까지 입력할 수 있습니다.`)
+      }
+      const id = `custom-${crypto.randomUUID()}`
+      const tagRef = doc(reasonTagsRef(uid), id)
+      await runTransaction(requireDb(), async (transaction) => {
+        transaction.set(tagRef, {
+          label: normalized,
+          active: true,
+          builtIn: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      })
+      const saved = await getDoc(tagRef)
+      return reasonTagFromDocument(saved.id, saved.data()!)
+    },
+
+    async setReasonTagActive(id: string, active: boolean) {
+      const tagRef = doc(reasonTagsRef(uid), id)
+      await runTransaction(requireDb(), async (transaction) => {
+        const snapshot = await transaction.get(tagRef)
+        if (snapshot.exists()) {
+          transaction.update(tagRef, { active, updatedAt: serverTimestamp() })
+          return
+        }
+        const defaultTag = DEFAULT_REASON_TAGS.find((tag) => tag.id === id)
+        if (!defaultTag) throw new Error('이유 태그를 찾지 못했습니다.')
+        transaction.set(tagRef, {
+          label: defaultTag.label,
+          active,
+          builtIn: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      })
     },
   }
 }

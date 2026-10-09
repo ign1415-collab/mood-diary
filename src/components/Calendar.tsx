@@ -1,4 +1,4 @@
-import type { Entry } from '../types'
+import type { Entry, Mood } from '../types'
 import { MOODS } from '../types'
 
 interface Props {
@@ -59,18 +59,19 @@ export function Calendar({ month, entries, selectedDate, today, onMonthChange, o
               key={date}
               disabled={disabled}
               onClick={() => onSelect(date)}
+              style={mood ? { backgroundColor: mood.color, color: mood.text } : undefined}
               aria-label={`${value}월 ${day}일${entry ? `, ${mood?.label}` : ', 기록 없음'}`}
               aria-pressed={date === selectedDate}
             >
               <span>{day}</span>
-              {mood && <i className="mood-dot" style={{ background: mood.color }} aria-hidden="true" />}
             </button>
           )
         })}
       </div>
-      <div className="calendar-legend" aria-label="달력 표시 안내">
-        <span><i className="selected-legend" />선택한 날짜</span>
-        <span><i className="today-legend" />오늘 날짜</span>
+      <div className="calendar-legend" aria-label="감정 색상 안내">
+        {(Object.keys(MOODS) as Mood[]).map((mood) => (
+          <span key={mood}><i style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</span>
+        ))}
       </div>
     </section>
   )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { auth } from '../firebase'
 import type { WeatherSnapshot } from '../types'
+import { WeatherIcon } from './WeatherIcon'
 
 type WeatherState =
   | { status: 'loading' }
@@ -8,6 +9,8 @@ type WeatherState =
   | { status: 'missing-key' }
   | { status: 'location-error' }
   | { status: 'api-error' }
+
+export type WeatherStatus = WeatherState['status']
 
 type OpenWeatherResponse = {
   temperature?: number
@@ -44,9 +47,11 @@ function currentPosition() {
 
 type Props = {
   onWeatherChange: (weather: WeatherSnapshot | null) => void
+  onStatusChange: (status: WeatherStatus) => void
+  requestKey: number
 }
 
-export function WeatherBadge({ onWeatherChange }: Props) {
+export function WeatherBadge({ onWeatherChange, onStatusChange, requestKey }: Props) {
   const [state, setState] = useState<WeatherState>({ status: 'loading' })
 
   const loadWeather = useCallback(async () => {
@@ -98,17 +103,8 @@ export function WeatherBadge({ onWeatherChange }: Props) {
     }
   }, [onWeatherChange])
 
-  useEffect(() => { void loadWeather() }, [loadWeather])
-
-  const content = state.status === 'ready'
-    ? `${state.weather.icon} ${state.weather.temperature}°`
-    : state.status === 'loading'
-      ? '날씨…'
-      : state.status === 'missing-key'
-        ? '날씨 설정'
-        : state.status === 'location-error'
-          ? '위치 허용'
-          : '날씨 재시도'
+  useEffect(() => { void loadWeather() }, [loadWeather, requestKey])
+  useEffect(() => { onStatusChange(state.status) }, [onStatusChange, state.status])
 
   const title = state.status === 'ready'
     ? `${state.weather.location} · ${state.weather.description} · ${state.weather.temperature}°C · 눌러서 새로고침`
@@ -129,7 +125,12 @@ export function WeatherBadge({ onWeatherChange }: Props) {
       title={title}
       aria-label={title}
     >
-      {content}
+      {state.status === 'ready' ? (
+        <><WeatherIcon description={state.weather.description} /><span>{state.weather.temperature}°</span></>
+      ) : state.status === 'loading' ? '날씨…'
+        : state.status === 'missing-key' ? '날씨 설정'
+          : state.status === 'location-error' ? '위치 허용'
+            : '날씨 재시도'}
     </button>
   )
 }

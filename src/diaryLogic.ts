@@ -1,9 +1,12 @@
-import type { Backup, Entry, Mood, Stats, WeatherSnapshot } from './types'
+import type { Backup, Entry, Mood, ReasonTag, Stats, WeatherSnapshot } from './types'
 
-export const MOOD_VALUES: Mood[] = ['happy', 'neutral', 'depressed', 'angry']
+export const MOOD_VALUES: Mood[] = ['happy', 'calm', 'excited', 'neutral', 'depressed', 'anxious', 'tired', 'angry']
 export const MAX_NOTE_LENGTH = 300
+export const MAX_REASON_IDS = 8
+export const MAX_REASON_LABEL_LENGTH = 8
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MONTH_RE = /^\d{4}-\d{2}$/
+const REASON_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/
 
 export function todayLocal() {
   const now = new Date()
@@ -34,12 +37,40 @@ export function monthAfter(month: string) {
 
 export function validateEntry(value: unknown) {
   if (!value || typeof value !== 'object') return '기록 형식이 올바르지 않습니다.'
-  const entry = value as { mood?: unknown; note?: unknown; weather?: unknown }
+  const entry = value as { mood?: unknown; note?: unknown; reason_ids?: unknown; weather?: unknown }
   if (!MOOD_VALUES.includes(entry.mood as Mood)) return '감정을 다시 선택해 주세요.'
   if (typeof entry.note !== 'string') return '메모 형식이 올바르지 않습니다.'
   if (entry.note.length > MAX_NOTE_LENGTH) return `메모는 ${MAX_NOTE_LENGTH}자까지 입력할 수 있습니다.`
+  if (entry.reason_ids !== undefined && !isValidReasonIds(entry.reason_ids)) return '이유 태그 형식이 올바르지 않습니다.'
   if (entry.weather !== undefined && !isValidWeather(entry.weather)) return '날씨 정보 형식이 올바르지 않습니다.'
   return null
+}
+
+function isValidReasonIds(value: unknown): value is string[] {
+  return Array.isArray(value)
+    && value.length <= MAX_REASON_IDS
+    && value.every((id) => typeof id === 'string' && REASON_ID_RE.test(id))
+    && new Set(value).size === value.length
+}
+
+function normalizeReasonTag(value: unknown): ReasonTag {
+  if (!value || typeof value !== 'object') throw new Error('백업에 올바르지 않은 이유 태그가 있습니다.')
+  const tag = value as Partial<ReasonTag>
+  if (typeof tag.id !== 'string' || !REASON_ID_RE.test(tag.id)
+    || typeof tag.label !== 'string' || !tag.label.trim() || tag.label.trim().length > MAX_REASON_LABEL_LENGTH
+    || typeof tag.active !== 'boolean' || typeof tag.built_in !== 'boolean'
+    || typeof tag.created_at !== 'string' || Number.isNaN(Date.parse(tag.created_at))
+    || typeof tag.updated_at !== 'string' || Number.isNaN(Date.parse(tag.updated_at))) {
+    throw new Error('백업에 올바르지 않은 이유 태그가 있습니다.')
+  }
+  return {
+    id: tag.id,
+    label: tag.label.trim(),
+    active: tag.active,
+    built_in: tag.built_in,
+    created_at: new Date(tag.created_at).toISOString(),
+    updated_at: new Date(tag.updated_at).toISOString(),
+  }
 }
 
 function isValidWeather(value: unknown): value is WeatherSnapshot {
@@ -59,8 +90,8 @@ function isValidWeather(value: unknown): value is WeatherSnapshot {
 
 export function validateBackup(value: unknown): Backup {
   if (!value || typeof value !== 'object') throw new Error('지원하는 감정 일기 백업 파일이 아닙니다.')
-  const backup = value as Partial<Backup>
-  if (![1, 2].includes(backup.schemaVersion ?? 0) || !Array.isArray(backup.entries)) {
+  const backup = value as { schemaVersion?: unknown; exportedAt?: unknown; entries?: unknown; reason_tags?: unknown }
+  if (![1, 2, 3].includes(Number(backup.schemaVersion)) || !Array.isArray(backup.entries)) {
     throw new Error('지원하는 감정 일기 백업 파일이 아닙니다.')
   }
   const dates = new Set<string>()
@@ -80,6 +111,7 @@ export function validateBackup(value: unknown): Backup {
       date: entry.date,
       mood: entry.mood,
       note: entry.note.trim(),
+      ...(entry.reason_ids?.length ? { reason_ids: [...entry.reason_ids] } : {}),
       ...(entry.weather ? { weather: {
         ...entry.weather,
         ...(entry.weather.observed_at ? { observed_at: new Date(entry.weather.observed_at).toISOString() } : {}),
@@ -88,10 +120,20 @@ export function validateBackup(value: unknown): Backup {
       updated_at: new Date(entry.updated_at).toISOString(),
     }
   })
+  const reasonTagValues = backup.schemaVersion === 3 ? backup.reason_tags : []
+  if (!Array.isArray(reasonTagValues)) throw new Error('백업에 이유 태그 목록이 없습니다.')
+  const tagIds = new Set<string>()
+  const reasonTags = reasonTagValues.map((value) => {
+    const tag = normalizeReasonTag(value)
+    if (tagIds.has(tag.id)) throw new Error('백업에 같은 이유 태그가 중복되어 있습니다.')
+    tagIds.add(tag.id)
+    return tag
+  })
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: typeof backup.exportedAt === 'string' ? backup.exportedAt : new Date().toISOString(),
     entries,
+    reason_tags: reasonTags,
   }
 }
 
@@ -104,5 +146,22 @@ export function calculateStats(entries: Entry[]): Stats {
       count: counts[mood],
       percentage: entries.length ? Math.round((counts[mood] / entries.length) * 100) : 0,
     }])) as Stats['moods'],
+  }
+}
+
+function shiftDate(date: string, amount: number) {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + amount)
+  return value.toISOString().slice(0, 10)
+}
+
+export function sevenDayComparison(entries: Entry[], today: string) {
+  const comparisonEnd = entries.some((entry) => entry.date === today) ? today : shiftDate(today, -1)
+  const currentStart = shiftDate(comparisonEnd, -6)
+  const previousEnd = shiftDate(currentStart, -1)
+  const previousStart = shiftDate(previousEnd, -6)
+  return {
+    current: entries.filter((entry) => entry.date >= currentStart && entry.date <= comparisonEnd),
+    previous: entries.filter((entry) => entry.date >= previousStart && entry.date <= previousEnd),
   }
 }

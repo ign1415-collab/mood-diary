@@ -6,6 +6,9 @@ import { AuthScreen } from './components/AuthScreen'
 import { auth } from './firebase'
 import './styles.css'
 
+const AUTH_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  && new URLSearchParams(window.location.search).has('auth-preview')
+
 function Root() {
   const [user, setUser] = useState<User | null>(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -22,6 +25,7 @@ function Root() {
   }, [])
 
   if (checkingAuth) return <div className="auth-loading" role="status">로그인 상태를 확인하고 있어요…</div>
+  if (AUTH_PREVIEW) return <AuthScreen />
   if (!user) return <AuthScreen />
   return <App userId={user.uid} userEmail={user.email ?? ''} onSignOut={() => auth?.signOut()} />
 }

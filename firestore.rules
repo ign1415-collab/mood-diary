@@ -8,10 +8,14 @@ service cloud.firestore {
 
     function validEntry(entryId) {
       return entryId.matches('^\\d{4}-\\d{2}-\\d{2}$')
-        && request.resource.data.keys().hasOnly(['mood', 'note', 'weather', 'createdAt', 'updatedAt'])
-        && request.resource.data.mood in ['happy', 'neutral', 'depressed', 'angry']
+        && request.resource.data.keys().hasOnly(['mood', 'note', 'reasonIds', 'weather', 'createdAt', 'updatedAt'])
+        && request.resource.data.mood in ['happy', 'calm', 'excited', 'neutral', 'depressed', 'anxious', 'tired', 'angry']
         && request.resource.data.note is string
         && request.resource.data.note.size() <= 300
+        && (!request.resource.data.keys().hasAny(['reasonIds']) || (
+          request.resource.data.reasonIds is list
+          && request.resource.data.reasonIds.size() <= 8
+        ))
         && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.createdAt <= request.resource.data.updatedAt
@@ -41,6 +45,21 @@ service cloud.firestore {
         );
     }
 
+    function validReasonTag(tagId) {
+      return tagId.size() > 0
+        && tagId.size() <= 100
+        && request.resource.data.keys().hasOnly(['label', 'active', 'builtIn', 'createdAt', 'updatedAt'])
+        && request.resource.data.label is string
+        && request.resource.data.label.size() > 0
+        && request.resource.data.label.size() <= 8
+        && request.resource.data.active is bool
+        && request.resource.data.builtIn is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.createdAt <= request.resource.data.updatedAt
+        && request.resource.data.updatedAt <= request.time;
+    }
+
     match /users/{userId} {
       allow read: if signedInAs(userId);
       allow create: if signedInAs(userId)
@@ -53,6 +72,12 @@ service cloud.firestore {
         && request.resource.data.currentGeneration.size() <= 100
         && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if false;
+
+      match /reasonTags/{tagId} {
+        allow read: if signedInAs(userId);
+        allow create, update: if signedInAs(userId) && validReasonTag(tagId);
+        allow delete: if false;
+      }
 
       match /diaries/{generationId} {
         allow read, delete: if signedInAs(userId);

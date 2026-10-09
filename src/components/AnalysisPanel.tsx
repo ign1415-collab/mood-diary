@@ -1,28 +1,227 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { AnalysisResult, Mood } from '../types'
+import type { AnalysisResult, Entry, Mood, ReasonTag } from '../types'
 import { MAX_NOTE_LENGTH } from '../diaryLogic'
 import { MOODS } from '../types'
+import { MoodIcon } from './MoodIcon'
+import { WeatherIcon } from './WeatherIcon'
+import type { WeatherStatus } from './WeatherBadge'
 
 interface Props {
   days: 7 | 30
   analysis: AnalysisResult | null
+  hasAnyHistory: boolean | null
   loading: boolean
   saving: boolean
+  reasonTags: ReasonTag[]
+  weatherDemo?: boolean
+  weatherStatus: WeatherStatus
+  onRequestWeather: () => void
   onDaysChange: (days: 7 | 30) => void
-  onUpdate: (date: string, value: { mood: Mood; note: string }) => Promise<boolean>
+  onStartEntry: () => void
+  onUpdate: (date: string, value: { mood: Mood; note: string; reason_ids: string[] }) => Promise<boolean>
   onDelete: (date: string) => Promise<void>
 }
 
-const moodEmoji: Record<Mood, string> = { happy: '😊', neutral: '🙂', depressed: '😔', angry: '😡' }
+const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토']
+const weatherOrder = ['맑음', '흐림', '비', '눈'] as const
+type WeatherGroup = typeof weatherOrder[number]
+type WeatherStat = {
+  group: WeatherGroup
+  description: string
+  count: number
+  counts: Record<Mood, number>
+  leadingMood: Mood | null
+}
 
-export function AnalysisPanel({ days, analysis, loading, saving, onDaysChange, onUpdate, onDelete }: Props) {
+type WeatherInsight = WeatherStat & { mood: Mood; moodCount: number; lift: number }
+
+const moodPastTense: Record<Mood, string> = {
+  happy: '행복했어요',
+  calm: '평온했어요',
+  excited: '설렜어요',
+  neutral: '보통이었어요',
+  depressed: '우울했어요',
+  anxious: '불안했어요',
+  tired: '피곤했어요',
+  angry: '화가 났어요',
+}
+
+function weatherSubject(group: WeatherGroup) {
+  if (group === '맑음') return '맑은 날엔'
+  if (group === '흐림') return '흐린 날엔'
+  if (group === '비') return '비 오는 날엔'
+  return '눈 오는 날엔'
+}
+
+function weatherEvidenceLabel(group: WeatherGroup) {
+  if (group === '맑음') return '맑은'
+  if (group === '흐림') return '흐린'
+  if (group === '비') return '비 오는'
+  return '눈 오는'
+}
+
+function findWeatherInsights(stats: WeatherStat[], overallCounts: Record<Mood, number>, total: number, moods: Mood[]) {
+  if (total === 0) return []
+  return stats
+    .filter((stat) => stat.count >= 4)
+    .flatMap((stat) => moods
+      .filter((mood) => stat.counts[mood] >= 2)
+      .map((mood) => ({
+        ...stat,
+        mood,
+        moodCount: stat.counts[mood],
+        lift: stat.counts[mood] / stat.count - overallCounts[mood] / total,
+      })))
+    .filter((insight) => insight.lift > 0)
+    .sort((left, right) => right.lift - left.lift)
+}
+
+function weatherGroup(description: string): WeatherGroup {
+  if (/눈|snow/i.test(description)) return '눈'
+  if (/비|소나기|rain|drizzle|thunder/i.test(description)) return '비'
+  if (/흐림|구름|cloud|mist|fog/i.test(description)) return '흐림'
+  return '맑음'
+}
+
+function shiftDate(date: string, amount: number) {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + amount)
+  return value.toISOString().slice(0, 10)
+}
+
+function shortDate(date: string) {
+  return new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${date}T00:00:00Z`))
+}
+
+function currentStreak(entries: Entry[], today: string) {
+  const recorded = new Set(entries.map((entry) => entry.date))
+  let cursor = recorded.has(today) ? today : shiftDate(today, -1)
+  let streak = 0
+  while (recorded.has(cursor)) {
+    streak += 1
+    cursor = shiftDate(cursor, -1)
+  }
+  return streak
+}
+
+function calculateMoodCounts(entries: Entry[], moods: Mood[]) {
+  return Object.fromEntries(moods.map((mood) => [
+    mood,
+    entries.filter((entry) => entry.mood === mood).length,
+  ])) as Record<Mood, number>
+}
+
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z" />
+    </svg>
+  )
+}
+
+export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, reasonTags, weatherDemo = false, weatherStatus, onRequestWeather, onDaysChange, onStartEntry, onUpdate, onDelete }: Props) {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null)
+  const [selectedReasonId, setSelectedReasonId] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [editingDate, setEditingDate] = useState<string | null>(null)
   const [editMood, setEditMood] = useState<Mood>('neutral')
   const [editNote, setEditNote] = useState('')
+  const [editReasonIds, setEditReasonIds] = useState<string[]>([])
+  const [showAllRecords, setShowAllRecords] = useState(false)
+  const [weatherCollapsed, setWeatherCollapsed] = useState(false)
+  const [reasonsCollapsed, setReasonsCollapsed] = useState(false)
   const moods = Object.keys(MOODS) as Mood[]
-  const visibleEntries = analysis?.entries.filter((entry) => !selectedMood || entry.mood === selectedMood) ?? []
+  const visibleEntries = analysis?.entries.filter((entry) => {
+    if (days === 7) return true
+    if (selectedMood) return entry.mood === selectedMood
+    if (selectedReasonId) return entry.reason_ids?.includes(selectedReasonId) ?? false
+    return true
+  }) ?? []
+  const today = localToday()
+  const weekDates = Array.from({ length: 7 }, (_, index) => shiftDate(today, index - 6))
+  const entriesByDate = new Map((analysis?.entries ?? []).map((entry) => [entry.date, entry]))
+  const topMoodCount = analysis ? Math.max(...moods.map((mood) => analysis.moods[mood].count)) : 0
+  const topMoods = analysis && topMoodCount > 0
+    ? moods.filter((mood) => analysis.moods[mood].count === topMoodCount)
+    : []
+  const weeklyTitle = days === 7 && analysis && analysis.total >= 3
+    ? topMoods.length === 1
+      ? `${MOODS[topMoods[0]].phrase}이 많은 한 주였어요`
+      : topMoods.length === 2
+        ? `${topMoods.map((mood) => MOODS[mood].phrase).join('과 ')}이 많은 한 주였어요`
+        : '여러 마음이 고르게 섞인 한 주였어요'
+    : null
+  const weeklyComparison = (() => {
+    if (days !== 7 || !analysis?.comparison
+      || analysis.comparison.current.length < 5 || analysis.comparison.previous.length < 5) return null
+    const currentCounts = calculateMoodCounts(analysis.comparison.current, moods)
+    const previousCounts = calculateMoodCounts(analysis.comparison.previous, moods)
+    const differences = moods.map((mood) => ({ mood, difference: currentCounts[mood] - previousCounts[mood] }))
+      .sort((left, right) => Math.abs(right.difference) - Math.abs(left.difference))
+    const strongest = differences[0]
+    if (!strongest || strongest.difference === 0) {
+      return `지난주와 이번 주 모두 ${analysis.comparison.current.length}일을 기록했고, 감정 구성도 같았어요`
+    }
+    const amount = Math.abs(strongest.difference)
+    return `지난주보다 ${MOODS[strongest.mood].phrase}이 ${amount}일 ${strongest.difference > 0 ? '늘었어요' : '줄었어요'}`
+  })()
+  const streak = currentStreak(analysis?.entries ?? [], today)
+  const sortedMoodStats = moods
+    .filter((mood) => (analysis?.moods[mood].count ?? 0) > 0)
+    .sort((left, right) => (analysis?.moods[right].count ?? 0) - (analysis?.moods[left].count ?? 0))
+  const monthlySummary = topMoods.length === 1
+    ? `${MOODS[topMoods[0]].phrase}이 제일 많았어요`
+    : topMoods.length <= 3
+      ? `${topMoods.map((mood) => MOODS[mood].label).join('과 ')}이 가장 많이 나타났어요`
+      : '여러 감정이 고르게 나타났어요'
+  const weatherEntries = (analysis?.entries ?? []).filter((entry) => entry.weather)
+  const weatherStats = weatherOrder.map((group) => {
+    const entries = weatherEntries.filter((entry) => entry.weather && weatherGroup(entry.weather.description) === group)
+    const counts = Object.fromEntries(moods.map((mood) => [mood, entries.filter((entry) => entry.mood === mood).length])) as Record<Mood, number>
+    const leadingMood = moods.reduce<Mood | null>((current, mood) => !current || counts[mood] > counts[current] ? mood : current, null)
+    return { group, description: entries[0]?.weather?.description ?? group, count: entries.length, counts, leadingMood }
+  }).filter((item) => item.count > 0)
+  const demoWeatherStats = [
+    { group: '맑음', description: '맑음', count: 12, counts: { happy: 6, calm: 3, excited: 2, neutral: 1, depressed: 0, anxious: 0, tired: 0, angry: 0 }, leadingMood: 'happy' },
+    { group: '흐림', description: '흐림', count: 8, counts: { happy: 2, calm: 0, excited: 0, neutral: 4, depressed: 0, anxious: 1, tired: 1, angry: 0 }, leadingMood: 'neutral' },
+    { group: '비', description: '비', count: 6, counts: { happy: 0, calm: 0, excited: 0, neutral: 0, depressed: 2, anxious: 0, tired: 3, angry: 1 }, leadingMood: 'tired' },
+  ] satisfies Array<{ group: WeatherGroup; description: string; count: number; counts: Record<Mood, number>; leadingMood: Mood }>
+  const displayedWeatherStats: WeatherStat[] = weatherDemo ? demoWeatherStats : weatherStats
+  const weatherBaselineCounts = weatherDemo
+    ? Object.fromEntries(moods.map((mood) => [mood, displayedWeatherStats.reduce((sum, stat) => sum + stat.counts[mood], 0)])) as Record<Mood, number>
+    : Object.fromEntries(moods.map((mood) => [mood, analysis?.moods[mood].count ?? 0])) as Record<Mood, number>
+  const weatherBaselineTotal = weatherDemo
+    ? Object.values(weatherBaselineCounts).reduce((sum, count) => sum + count, 0)
+    : analysis?.total ?? 0
+  const weatherInsights = findWeatherInsights(displayedWeatherStats, weatherBaselineCounts, weatherBaselineTotal, moods)
+  const primaryWeatherInsight: WeatherInsight | null = weatherInsights[0]?.lift >= .2 ? weatherInsights[0] : null
+  const secondaryWeatherInsight = primaryWeatherInsight
+    ? weatherInsights.find((insight) => insight.group !== primaryWeatherInsight.group)
+    : null
+  const displayedEntries = days === 30 && !showAllRecords ? visibleEntries.slice(0, 3) : visibleEntries
+  const usedReasonIds = [...new Set((analysis?.entries ?? []).flatMap((entry) => entry.reason_ids ?? []))]
+  const reasonTaggedEntries = (analysis?.entries ?? []).filter((entry) => (entry.reason_ids?.length ?? 0) > 0)
+  const reasonStats = usedReasonIds.map((id) => ({
+    id,
+    label: reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유',
+    count: (analysis?.entries ?? []).filter((entry) => entry.reason_ids?.includes(id)).length,
+  })).sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'ko'))
+  const topReasonCount = reasonStats[0]?.count ?? 0
+  const reasonHeadlineCandidates = moods.flatMap((mood) => {
+    const moodEntries = (analysis?.entries ?? []).filter((entry) => entry.mood === mood)
+    if (moodEntries.length < 4) return []
+    return reasonStats.map((reason) => {
+      const count = moodEntries.filter((entry) => entry.reason_ids?.includes(reason.id)).length
+      return { mood, moodTotal: moodEntries.length, reason, count, ratio: count / moodEntries.length }
+    }).filter((candidate) => candidate.count > 0 && candidate.ratio >= .5)
+  }).sort((left, right) => right.ratio - left.ratio || right.count - left.count)
+  const reasonHeadline = reasonHeadlineCandidates[0]
 
   useEffect(() => {
     if (!openMenu) return
@@ -43,60 +242,305 @@ export function AnalysisPanel({ days, analysis, loading, saving, onDaysChange, o
     }
   }, [openMenu])
 
-  useEffect(() => setOpenMenu(null), [days, selectedMood])
+  useEffect(() => setOpenMenu(null), [days, selectedMood, selectedReasonId])
+  useEffect(() => {
+    setSelectedMood(null)
+    setSelectedReasonId(null)
+    setShowAllRecords(false)
+  }, [days])
 
   function startEditing(entry: AnalysisResult['entries'][number]) {
     setOpenMenu(null)
     setEditingDate(entry.date)
     setEditMood(entry.mood)
     setEditNote(entry.note)
+    setEditReasonIds(entry.reason_ids ?? [])
   }
 
   async function submitEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!editingDate) return
-    if (await onUpdate(editingDate, { mood: editMood, note: editNote })) setEditingDate(null)
+    if (await onUpdate(editingDate, { mood: editMood, note: editNote, reason_ids: editReasonIds })) setEditingDate(null)
+  }
+
+  if (loading || !analysis || analysis.days !== days) {
+    return (
+      <div className="analysis-content analysis-loading">
+        <div className="analysis-period-switch" aria-label="분석 기간">
+          <button type="button" className={days === 7 ? 'active' : ''} onClick={() => onDaysChange(7)}>최근 7일</button>
+          <button type="button" className={days === 30 ? 'active' : ''} onClick={() => onDaysChange(30)}>최근 30일</button>
+        </div>
+        <section className="analysis-loading-card" role="status" aria-live="polite">
+          <span className="analysis-loading-mark" aria-hidden="true" />
+          <p>분석을 불러오고 있어요.</p>
+        </section>
+      </div>
+    )
+  }
+
+  if (analysis.total === 0) {
+    const firstEver = hasAnyHistory === false
+    const title = firstEver
+      ? '첫 마음을 기다리고 있어요'
+      : days === 7 ? '이번 주의 첫 마음을 기다리고 있어요' : '이번 달의 첫 마음을 기다리고 있어요'
+
+    return (
+      <div className="analysis-content analysis-empty">
+        <div className="analysis-period-switch" aria-label="분석 기간">
+          <button type="button" className={days === 7 ? 'active' : ''} onClick={() => onDaysChange(7)}>최근 7일</button>
+          <button type="button" className={days === 30 ? 'active' : ''} onClick={() => onDaysChange(30)}>최근 30일</button>
+        </div>
+
+        <section className="analysis-welcome-card">
+          <h2>{title}</h2>
+          <p>하루에 하나씩 기록하면, 이 칸들이 그날의 감정색으로 채워져요.</p>
+          <div className="welcome-week-strip" aria-label="기록을 기다리는 최근 7일">
+            {weekDates.map((date) => {
+              const value = new Date(`${date}T00:00:00Z`)
+              const isToday = date === today
+              return (
+                <div className={`welcome-week-day ${isToday ? 'today' : ''}`} key={date}>
+                  <span>{isToday ? '오늘' : weekdayLabels[value.getUTCDay()]}</span>
+                  <strong>{value.getUTCDate()}</strong>
+                </div>
+              )
+            })}
+          </div>
+          <button type="button" className="start-entry-button" onClick={onStartEntry}>오늘 마음 기록하기 <span aria-hidden="true">→</span></button>
+        </section>
+      </div>
+    )
   }
 
   return (
     <div className="analysis-content">
-      <section className="analysis-card" aria-labelledby="analysis-title">
-        <div className="analysis-heading">
-          <h2 id="analysis-title">감정 분석</h2>
-          <div className="period-switch" aria-label="분석 기간">
-            <button type="button" className={days === 7 ? 'active' : ''} onClick={() => onDaysChange(7)}>최근 7일</button>
-            <button type="button" className={days === 30 ? 'active' : ''} onClick={() => onDaysChange(30)}>최근 30일</button>
+      {days === 7 ? (
+        <>
+          <div className="analysis-period-switch" aria-label="분석 기간">
+            <button type="button" className="active" onClick={() => onDaysChange(7)}>최근 7일</button>
+            <button type="button" onClick={() => onDaysChange(30)}>최근 30일</button>
           </div>
-        </div>
 
-        <button type="button" className={`analysis-total ${selectedMood === null ? 'active' : ''}`} onClick={() => setSelectedMood(null)}>
-          <span className="analysis-total-label">전체</span><strong>{analysis?.total ?? 0}회</strong>
-        </button>
+          <section className="analysis-checkin-card" aria-label="기록 횟수">
+            <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
+            <div>
+              <strong>최근 7일 중 {analysis.total}일을 기록했어요</strong>
+              <p>{streak === 7 ? '최근 7일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '오늘의 마음부터 천천히 남겨보세요.'}</p>
+            </div>
+          </section>
 
-        <div className="analysis-moods">
-          {moods.map((mood) => (
-            <button type="button" key={mood} className={selectedMood === mood ? 'active' : ''} onClick={() => setSelectedMood(mood)}>
-              <span className="analysis-mood-label"><i aria-hidden="true" style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</span>
-              <strong>{analysis?.moods[mood].count ?? 0}회</strong>
-            </button>
-          ))}
-        </div>
-        <p className="analysis-hint">원하는 감정을 선택하면 해당 감정의 기록을 볼 수 있어요.</p>
-      </section>
+          <section className="analysis-week-card" aria-label="최근 7일 감정">
+            <p className="analysis-range">{shortDate(weekDates[0])} - {shortDate(weekDates[6])}</p>
+            {weeklyTitle && <h2>{weeklyTitle}</h2>}
+            {weeklyComparison && <p className="analysis-week-comparison">{weeklyComparison}</p>}
+            <div className="week-strip">
+              {weekDates.map((date) => {
+                const entry = entriesByDate.get(date)
+                const mood = entry ? MOODS[entry.mood] : null
+                const value = new Date(`${date}T00:00:00Z`)
+                return (
+                  <div className={`week-day ${entry ? 'recorded' : ''} ${date === today ? 'today' : ''}`} key={date}>
+                    <span>{weekdayLabels[value.getUTCDay()]}</span>
+                    <strong style={mood ? { background: mood.color, color: mood.text } : undefined}>{value.getUTCDate()}</strong>
+                    <small>{mood?.label ?? ''}</small>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <div className="analysis-period-switch" aria-label="분석 기간">
+            <button type="button" onClick={() => onDaysChange(7)}>최근 7일</button>
+            <button type="button" className="active" onClick={() => onDaysChange(30)}>최근 30일</button>
+          </div>
+
+          <section className="analysis-checkin-card" aria-label="기록 횟수">
+            <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
+            <div>
+              <strong>최근 30일 중 {analysis.total}일을 기록했어요</strong>
+              <p>{streak >= 30 ? '최근 30일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '다시 기록을 시작해도 괜찮아요.'}</p>
+            </div>
+          </section>
+
+          <section className="analysis-month-card" aria-label="최근 30일 감정 요약">
+            <p>30일 동안 {analysis?.total ?? 0}번 기록했어요</p>
+            <h2>{monthlySummary}</h2>
+            <div className="mood-ratio-bar" aria-label="감정별 기록 비율">
+              {sortedMoodStats.map((mood) => (
+                <span key={mood} style={{ flex: analysis?.moods[mood].count, background: MOODS[mood].color }} title={`${MOODS[mood].label} ${analysis?.moods[mood].count}회`} />
+              ))}
+            </div>
+            <div className="mood-ratio-legend">
+              {sortedMoodStats.map((mood) => (
+                <button
+                  type="button"
+                  key={mood}
+                  className={selectedMood === mood ? 'active' : ''}
+                  onClick={() => { setSelectedMood(selectedMood === mood ? null : mood); setSelectedReasonId(null); setShowAllRecords(false) }}
+                >
+                  <span><i style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</span>
+                  <strong>{analysis?.moods[mood].count}회</strong>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="analysis-weather-card" aria-label="날씨별 기분">
+            <div className="analysis-collapsible-heading">
+              <p>날씨별 기분{weatherDemo && <span className="analysis-demo-label">미리보기</span>}</p>
+              <button type="button" aria-expanded={!weatherCollapsed} aria-controls="weather-analysis-details" onClick={() => setWeatherCollapsed((collapsed) => !collapsed)}>
+                {weatherCollapsed ? '펼치기' : '접기'} <span aria-hidden="true">{weatherCollapsed ? '▾' : '▴'}</span>
+              </button>
+            </div>
+            {weatherDemo || weatherEntries.length >= 10 ? (
+              <>
+                <h2>{primaryWeatherInsight
+                  ? `${weatherSubject(primaryWeatherInsight.group)} ${MOODS[primaryWeatherInsight.mood].phrase}이 많았어요`
+                  : '날씨에 따른 뚜렷한 차이는 아직 없어요'}</h2>
+                <div id="weather-analysis-details" hidden={weatherCollapsed}>
+                  <div className="weather-patterns">
+                    {displayedWeatherStats.map(({ group, description, count, counts, leadingMood }) => (
+                      <div className="weather-pattern" key={group}>
+                        <span><WeatherIcon description={description} size={15} />{group} {count}일</span>
+                        <div className="weather-ratio-bar">
+                          {moods.filter((mood) => counts[mood] > 0).map((mood) => (
+                            <i key={mood} style={{ flex: counts[mood], background: MOODS[mood].color }} />
+                          ))}
+                        </div>
+                        <strong>{leadingMood ? MOODS[leadingMood].label : ''}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  {primaryWeatherInsight && (
+                    <div className="weather-insight-evidence">
+                      <p>
+                        <i style={{ background: MOODS[primaryWeatherInsight.mood].color }} />
+                        <span>{weatherEvidenceLabel(primaryWeatherInsight.group)} {primaryWeatherInsight.count}일 중 {primaryWeatherInsight.moodCount}일이 {moodPastTense[primaryWeatherInsight.mood]}. 전체 기록에서는 {weatherBaselineTotal}일 중 {weatherBaselineCounts[primaryWeatherInsight.mood]}일이 {moodPastTense[primaryWeatherInsight.mood]}.</span>
+                      </p>
+                      {secondaryWeatherInsight && (
+                        <p>
+                          <i style={{ background: MOODS[secondaryWeatherInsight.mood].color }} />
+                          <span>{weatherEvidenceLabel(secondaryWeatherInsight.group)} {secondaryWeatherInsight.count}일 중 {secondaryWeatherInsight.moodCount}일은 {moodPastTense[secondaryWeatherInsight.mood]}.</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {weatherCollapsed && <h2>{weatherStatus === 'location-error' ? '위치를 허용하면 날씨도 함께 기록돼요' : `날씨 기록 ${weatherEntries.length} / 10`}</h2>}
+                <div id="weather-analysis-details" hidden={weatherCollapsed}>
+                  {weatherStatus === 'location-error' ? (
+                    <div className="analysis-weather-permission">
+                      <p>위치를 허용하면 오늘 날짜의 기록을 저장할 때 날씨가 함께 저장돼요.</p>
+                      <button type="button" onClick={onRequestWeather}>위치 허용하기</button>
+                    </div>
+                  ) : (
+                    <div className="analysis-coming-soon weather-progress">
+                      <strong>날씨 기록 {weatherEntries.length} / 10</strong>
+                      <p>
+                        <span>날씨는 <b>오늘 날짜의 기록</b>을 저장할 때 자동으로 함께 저장돼요.</span>
+                        <span>지난 날짜의 기록에는 날씨가 저장되지 않아요.</span>
+                        <span>10개가 모이면 날씨와 마음의 관계를 알려드릴게요.</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+
+          {reasonStats.length > 0 && (
+            <section className="analysis-reasons-card" aria-label="자주 고른 이유">
+              <div className="analysis-collapsible-heading">
+                <p>자주 고른 이유</p>
+                <button type="button" aria-expanded={!reasonsCollapsed} aria-controls="reason-analysis-details" onClick={() => setReasonsCollapsed((collapsed) => !collapsed)}>
+                  {reasonsCollapsed ? '펼치기' : '접기'} <span aria-hidden="true">{reasonsCollapsed ? '▾' : '▴'}</span>
+                </button>
+              </div>
+              {reasonTaggedEntries.length < 10 ? (
+                <>
+                  {reasonsCollapsed && <h2>이유 기록 {reasonTaggedEntries.length} / 10</h2>}
+                  <div id="reason-analysis-details" hidden={reasonsCollapsed}>
+                    <div className="analysis-coming-soon reason-progress">
+                      <strong>이유 기록 {reasonTaggedEntries.length} / 10</strong>
+                      <span>조금 더 쌓이면 감정과 이유의 관계를 알려드릴게요.</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2>{reasonHeadline
+                    ? `${MOODS[reasonHeadline.mood].phrase} ${reasonHeadline.moodTotal}일 중 ${reasonHeadline.count}일이 ${reasonHeadline.reason.label} 때문이었어요`
+                    : '감정에 따라 반복되는 이유는 아직 뚜렷하지 않아요'}</h2>
+                  <div id="reason-analysis-details" hidden={reasonsCollapsed}>
+                    <div className="reason-analysis-list">
+                      {reasonStats.map((reason) => (
+                        <button
+                          type="button"
+                          key={reason.id}
+                          className={selectedReasonId === reason.id ? 'active' : ''}
+                          aria-pressed={selectedReasonId === reason.id}
+                          onClick={() => {
+                            setSelectedReasonId(selectedReasonId === reason.id ? null : reason.id)
+                            setSelectedMood(null)
+                            setShowAllRecords(false)
+                          }}
+                        >
+                          <span>{reason.label}</span>
+                          <i><b style={{ width: `${reason.count / topReasonCount * 100}%` }} /></i>
+                          <strong>{reason.count}회</strong>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+        </>
+      )}
 
       <section className="analysis-records" aria-label="감정 기록 목록">
+        <div className="analysis-records-heading">
+          <h2>{days === 7
+            ? '최근 7일 기록'
+            : selectedMood
+              ? `${MOODS[selectedMood].label} 기록 ${visibleEntries.length}개`
+              : selectedReasonId
+                ? `${reasonTags.find((tag) => tag.id === selectedReasonId)?.label ?? '이유'} 기록 ${visibleEntries.length}개`
+                : `기록 ${visibleEntries.length}개`}</h2>
+          {days === 30 && (selectedMood || selectedReasonId) && (
+            <button type="button" onClick={() => { setSelectedMood(null); setSelectedReasonId(null); setShowAllRecords(false) }}>전체 보기</button>
+          )}
+        </div>
         {loading ? (
           <p>기록을 불러오고 있어요.</p>
         ) : visibleEntries.length === 0 ? (
-          <p>아직 표시할 기록이 없어요.</p>
+          <p>{days === 7 && (analysis?.total ?? 0) === 0
+            ? '첫 마음을 기록하면 이곳에서 한 주를 돌아볼 수 있어요.'
+            : '아직 표시할 기록이 없어요.'}</p>
         ) : (
-          visibleEntries.map((entry) => (
+          <>
+          {displayedEntries.map((entry) => (
             <article key={entry.date}>
-              <div className="record-mood"><span aria-hidden="true">{moodEmoji[entry.mood]}</span><strong>{MOODS[entry.mood].label}</strong></div>
+              <div className="record-mood">
+                <MoodIcon mood={entry.mood} size={24} />
+                <strong>{MOODS[entry.mood].label}</strong>
+                {!!entry.reason_ids?.length && (
+                  <span className="record-reasons">
+                    {entry.reason_ids.map((id) => <small key={id}>{reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유'}</small>)}
+                  </span>
+                )}
+              </div>
               <div className="record-actions">
                 {entry.weather && (
                   <span className="record-weather" title={entry.weather.location ? `${entry.weather.location} · ${entry.weather.description}` : entry.weather.description}>
-                    {entry.weather.icon}{entry.weather.temperature !== undefined ? ` ${entry.weather.temperature}°` : ''}
+                    <WeatherIcon description={entry.weather.description} size={14} />
+                    {entry.weather.temperature !== undefined ? `${entry.weather.temperature}°` : ''}
                   </span>
                 )}
                 <time dateTime={entry.date}>{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${entry.date}T00:00:00Z`))}</time>
@@ -117,8 +561,24 @@ export function AnalysisPanel({ days, analysis, loading, saving, onDaysChange, o
                       {(Object.keys(MOODS) as Mood[]).map((mood) => (
                         <label key={mood}>
                           <input type="radio" name={`edit-mood-${entry.date}`} checked={editMood === mood} onChange={() => setEditMood(mood)} />
-                          <span><i aria-hidden="true">{moodEmoji[mood]}</i>{MOODS[mood].label}</span>
+                          <span><MoodIcon mood={mood} size={20} />{MOODS[mood].label}</span>
                         </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <fieldset className="analysis-edit-reasons">
+                    <legend>이유 <small>선택 사항</small></legend>
+                    <div>
+                      {reasonTags.filter((tag) => tag.active || editReasonIds.includes(tag.id)).map((tag) => (
+                        <button
+                          type="button"
+                          key={tag.id}
+                          className={editReasonIds.includes(tag.id) ? 'selected' : ''}
+                          aria-pressed={editReasonIds.includes(tag.id)}
+                          onClick={() => setEditReasonIds((current) => current.includes(tag.id) ? current.filter((id) => id !== tag.id) : current.length < 8 ? [...current, tag.id] : current)}
+                        >
+                          {tag.label}
+                        </button>
                       ))}
                     </div>
                   </fieldset>
@@ -128,6 +588,7 @@ export function AnalysisPanel({ days, analysis, loading, saving, onDaysChange, o
                       value={editNote}
                       maxLength={MAX_NOTE_LENGTH}
                       rows={2}
+                      spellCheck={false}
                       placeholder="어떤 하루였는지 들려주세요."
                       onChange={(event) => setEditNote(event.target.value)}
                     />
@@ -139,7 +600,13 @@ export function AnalysisPanel({ days, analysis, loading, saving, onDaysChange, o
                 </form>
               )}
             </article>
-          ))
+          ))}
+          {days === 30 && visibleEntries.length > 3 && (
+            <button type="button" className="show-more-records" onClick={() => setShowAllRecords(!showAllRecords)}>
+              {showAllRecords ? '접기' : `더 보기 (${visibleEntries.length - 3}개)`}
+            </button>
+          )}
+          </>
         )}
       </section>
 
