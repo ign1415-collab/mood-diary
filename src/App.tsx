@@ -104,6 +104,8 @@ type AppProps = {
   userId: string
   userEmail: string
   onSignOut: () => Promise<void> | undefined
+  /** 테스트에서 날짜 경계를 고정하기 위한 값. 실제 앱에서는 전달하지 않는다. */
+  todayOverride?: string
 }
 
 function NavIcon({ name }: { name: 'home' | 'analysis' }) {
@@ -114,9 +116,9 @@ function NavIcon({ name }: { name: 'home' | 'analysis' }) {
   )
 }
 
-export default function App({ userId, userEmail, onSignOut }: AppProps) {
+export default function App({ userId, userEmail, onSignOut, todayOverride }: AppProps) {
   const api = useMemo(() => createDiaryApi(userId), [userId])
-  const today = localDate()
+  const today = todayOverride ?? localDate()
   const [selectedDate, setSelectedDate] = useState(today)
   const [month, setMonth] = useState(today.slice(0, 7))
   const [entries, setEntries] = useState<Entry[]>([])
@@ -157,24 +159,17 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
       setHasAnyHistory(cloudHasAnyHistory || previewHasEntry)
       if (PREVIEW_MODE) {
         const start = startDateForPeriod(today, days)
+        const streakPool = mergePreviewEntries(
+          userId,
+          cloudAnalysis.streak_entries ?? cloudAnalysis.comparison_pool ?? cloudAnalysis.entries,
+          (date) => date <= today,
+        ).sort((a, b) => b.date.localeCompare(a.date))
         if (days === 7) {
-          const earliest = new Date(`${today}T00:00:00Z`)
-          earliest.setUTCDate(earliest.getUTCDate() - 14)
-          const earliestValue = earliest.toISOString().slice(0, 10)
-          const pool = mergePreviewEntries(
-            userId,
-            cloudAnalysis.comparison_pool ?? cloudAnalysis.entries,
-            (date) => date >= earliestValue && date <= today,
-          ).sort((a, b) => b.date.localeCompare(a.date))
-          const merged = pool.filter((entry) => entry.date >= start)
-          setAnalysis({ days, ...calculateStats(merged), entries: merged, comparison: sevenDayComparison(pool, today), comparison_pool: pool })
+          const merged = streakPool.filter((entry) => entry.date >= start)
+          setAnalysis({ days, ...calculateStats(merged), entries: merged, streak_entries: streakPool, comparison: sevenDayComparison(streakPool, today), comparison_pool: streakPool })
         } else {
-          const merged = mergePreviewEntries(
-            userId,
-            cloudAnalysis.entries,
-            (date) => date >= start && date <= today,
-          ).sort((a, b) => b.date.localeCompare(a.date))
-          setAnalysis({ days, ...calculateStats(merged), entries: merged })
+          const merged = streakPool.filter((entry) => entry.date >= start)
+          setAnalysis({ days, ...calculateStats(merged), entries: merged, streak_entries: streakPool })
         }
       } else {
         setAnalysis(cloudAnalysis)

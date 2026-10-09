@@ -6,13 +6,13 @@ import type { Entry } from '../src/types.ts'
 const timestamp = '2025-01-01T00:00:00.000Z'
 
 describe('감정 기록 검증', () => {
-  test('올바른 날짜와 다음 달을 계산한다', () => {
+  test('D4·D5·D6 올바른 날짜와 다음 달을 계산한다', () => {
     assert.equal(isValidDate('2025-02-28'), true)
     assert.equal(isValidDate('2025-02-30'), false)
     assert.equal(monthAfter('2025-12'), '2026-01')
   })
 
-  test('감정 값과 메모 300자 제한을 확인한다', () => {
+  test('H3 감정 8개와 메모 300자 제한을 확인한다', () => {
     assert.equal(validateEntry({ mood: 'happy', note: '가'.repeat(300) }), null)
     assert.equal(validateEntry({ mood: 'excited', note: '' }), null)
     assert.equal(validateEntry({ mood: 'calm', note: '', reason_ids: ['sleep', 'study'] }), null)
@@ -61,7 +61,7 @@ describe('감정 기록 검증', () => {
     assert.deepEqual(withToday.previous.map((item) => item.date), ['2026-10-02', '2026-09-26'])
   })
 
-  test('중복 날짜나 잘못된 백업 전체를 거부한다', () => {
+  test('H6 중복 날짜나 잘못된 백업 전체를 거부한다', () => {
     const entry = { date: '2025-01-01', mood: 'happy', note: '', created_at: timestamp, updated_at: timestamp }
     assert.throws(() => validateBackup({ schemaVersion: 2, entries: [entry, entry] }), /중복/)
     assert.throws(() => validateBackup({
@@ -70,7 +70,7 @@ describe('감정 기록 검증', () => {
     }), /300자/)
   })
 
-  test('이전 백업을 버전 3으로 올리고 이유 태그를 보존한다', () => {
+  test('H6·H7 이전 백업을 버전 3으로 올리고 이유·날씨 빈 값과 태그를 보존한다', () => {
     const entry = { date: '2025-01-01', mood: 'calm', note: '', created_at: timestamp, updated_at: timestamp }
     const upgraded = validateBackup({ schemaVersion: 2, entries: [entry] })
     assert.equal(upgraded.schemaVersion, 3)
@@ -83,5 +83,28 @@ describe('감정 기록 검증', () => {
     })
     assert.deepEqual(backup.entries[0].reason_ids, ['sleep'])
     assert.equal(backup.reason_tags[0].label, '잠')
+  })
+
+  test('D7·D8 저장 시각이 달라도 기록 날짜 2026-10-09를 유지한다', () => {
+    for (const created_at of ['2026-10-08T15:30:00.000Z', '2026-10-09T14:59:00.000Z']) {
+      const backup = validateBackup({
+        schemaVersion: 3,
+        entries: [{ date: '2026-10-09', mood: 'happy', note: '', created_at, updated_at: created_at }],
+        reason_tags: [],
+      })
+      assert.equal(backup.entries[0].date, '2026-10-09')
+    }
+  })
+
+  test('H4 기존 행복·화남 저장값을 바꾸지 않는다', () => {
+    const backup = validateBackup({
+      schemaVersion: 3,
+      entries: [
+        { date: '2026-10-08', mood: 'happy', note: '', created_at: timestamp, updated_at: timestamp },
+        { date: '2026-10-09', mood: 'angry', note: '', created_at: timestamp, updated_at: timestamp },
+      ],
+      reason_tags: [],
+    })
+    assert.deepEqual(backup.entries.map((entry) => entry.mood), ['happy', 'angry'])
   })
 })

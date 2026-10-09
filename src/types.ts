@@ -48,6 +48,7 @@ export interface Stats {
 export interface AnalysisResult extends Stats {
   days: 7 | 30
   entries: Entry[]
+  streak_entries?: Entry[]
   comparison?: {
     current: Entry[]
     previous: Entry[]

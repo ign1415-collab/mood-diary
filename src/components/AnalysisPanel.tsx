@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { AnalysisResult, Entry, Mood, ReasonTag } from '../types'
-import { MAX_NOTE_LENGTH } from '../diaryLogic'
+import { calculateStats, isKnownMood, MAX_NOTE_LENGTH } from '../diaryLogic'
+import { ANALYSIS_THRESHOLDS } from '../analysisConstants'
 import { MOODS } from '../types'
 import { MoodIcon } from './MoodIcon'
 import { WeatherIcon } from './WeatherIcon'
@@ -23,9 +24,9 @@ interface Props {
 }
 
 const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토']
-const weatherOrder = ['맑음', '흐림', '비', '눈'] as const
-type WeatherGroup = typeof weatherOrder[number]
-type WeatherStat = {
+export const weatherOrder = ['맑음', '흐림', '비', '눈'] as const
+export type WeatherGroup = typeof weatherOrder[number]
+export type WeatherStat = {
   group: WeatherGroup
   description: string
   count: number
@@ -33,7 +34,7 @@ type WeatherStat = {
   leadingMood: Mood | null
 }
 
-type WeatherInsight = WeatherStat & { mood: Mood; moodCount: number; lift: number }
+export type WeatherInsight = WeatherStat & { mood: Mood; moodCount: number; lift: number }
 
 const moodPastTense: Record<Mood, string> = {
   happy: '행복했어요',
@@ -46,26 +47,26 @@ const moodPastTense: Record<Mood, string> = {
   angry: '화가 났어요',
 }
 
-function weatherSubject(group: WeatherGroup) {
+export function weatherSubject(group: WeatherGroup) {
   if (group === '맑음') return '맑은 날엔'
   if (group === '흐림') return '흐린 날엔'
   if (group === '비') return '비 오는 날엔'
   return '눈 오는 날엔'
 }
 
-function weatherEvidenceLabel(group: WeatherGroup) {
+export function weatherEvidenceLabel(group: WeatherGroup) {
   if (group === '맑음') return '맑은'
   if (group === '흐림') return '흐린'
   if (group === '비') return '비 오는'
   return '눈 오는'
 }
 
-function findWeatherInsights(stats: WeatherStat[], overallCounts: Record<Mood, number>, total: number, moods: Mood[]) {
+export function findWeatherInsights(stats: WeatherStat[], overallCounts: Record<Mood, number>, total: number, moods: Mood[]) {
   if (total === 0) return []
   return stats
-    .filter((stat) => stat.count >= 4)
+    .filter((stat) => stat.count >= ANALYSIS_THRESHOLDS.weatherGroupMinEntries)
     .flatMap((stat) => moods
-      .filter((mood) => stat.counts[mood] >= 2)
+      .filter((mood) => stat.counts[mood] >= ANALYSIS_THRESHOLDS.weatherMoodMinCount)
       .map((mood) => ({
         ...stat,
         mood,
@@ -73,17 +74,19 @@ function findWeatherInsights(stats: WeatherStat[], overallCounts: Record<Mood, n
         lift: stat.counts[mood] / stat.count - overallCounts[mood] / total,
       })))
     .filter((insight) => insight.lift > 0)
-    .sort((left, right) => right.lift - left.lift)
+    .sort((left, right) => right.lift - left.lift
+      || right.count - left.count
+      || weatherOrder.indexOf(left.group) - weatherOrder.indexOf(right.group))
 }
 
-function weatherGroup(description: string): WeatherGroup {
+export function weatherGroup(description: string): WeatherGroup {
   if (/눈|snow/i.test(description)) return '눈'
   if (/비|소나기|rain|drizzle|thunder/i.test(description)) return '비'
   if (/흐림|구름|cloud|mist|fog/i.test(description)) return '흐림'
   return '맑음'
 }
 
-function shiftDate(date: string, amount: number) {
+export function shiftDate(date: string, amount: number) {
   const value = new Date(`${date}T00:00:00Z`)
   value.setUTCDate(value.getUTCDate() + amount)
   return value.toISOString().slice(0, 10)
@@ -94,7 +97,13 @@ function shortDate(date: string) {
     .format(new Date(`${date}T00:00:00Z`))
 }
 
-function currentStreak(entries: Entry[], today: string) {
+function withObjectParticle(label: string) {
+  const last = label.codePointAt(label.length - 1)
+  const hasFinalConsonant = last !== undefined && last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0
+  return `${label}${hasFinalConsonant ? '을' : '를'}`
+}
+
+export function currentStreak(entries: Entry[], today: string) {
   const recorded = new Set(entries.map((entry) => entry.date))
   let cursor = recorded.has(today) ? today : shiftDate(today, -1)
   let streak = 0
@@ -137,20 +146,23 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
   const [weatherCollapsed, setWeatherCollapsed] = useState(false)
   const [reasonsCollapsed, setReasonsCollapsed] = useState(false)
   const moods = Object.keys(MOODS) as Mood[]
-  const visibleEntries = analysis?.entries.filter((entry) => {
+  const allEntries = analysis?.entries ?? []
+  const validEntries = allEntries.filter((entry) => isKnownMood(entry.mood))
+  const validStats = calculateStats(validEntries)
+  const visibleEntries = allEntries.filter((entry) => {
     if (days === 7) return true
     if (selectedMood) return entry.mood === selectedMood
     if (selectedReasonId) return entry.reason_ids?.includes(selectedReasonId) ?? false
     return true
-  }) ?? []
+  })
   const today = localToday()
   const weekDates = Array.from({ length: 7 }, (_, index) => shiftDate(today, index - 6))
-  const entriesByDate = new Map((analysis?.entries ?? []).map((entry) => [entry.date, entry]))
-  const topMoodCount = analysis ? Math.max(...moods.map((mood) => analysis.moods[mood].count)) : 0
+  const entriesByDate = new Map(allEntries.map((entry) => [entry.date, entry]))
+  const topMoodCount = analysis ? Math.max(...moods.map((mood) => validStats.moods[mood].count)) : 0
   const topMoods = analysis && topMoodCount > 0
-    ? moods.filter((mood) => analysis.moods[mood].count === topMoodCount)
+    ? moods.filter((mood) => validStats.moods[mood].count === topMoodCount)
     : []
-  const weeklyTitle = days === 7 && analysis && analysis.total >= 3
+  const weeklyTitle = days === 7 && analysis && validStats.total >= ANALYSIS_THRESHOLDS.weeklyTitleMinDays
     ? topMoods.length === 1
       ? `${MOODS[topMoods[0]].phrase}이 많은 한 주였어요`
       : topMoods.length === 2
@@ -158,29 +170,38 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
         : '여러 마음이 고르게 섞인 한 주였어요'
     : null
   const weeklyComparison = (() => {
-    if (days !== 7 || !analysis?.comparison
-      || analysis.comparison.current.length < 5 || analysis.comparison.previous.length < 5) return null
-    const currentCounts = calculateMoodCounts(analysis.comparison.current, moods)
-    const previousCounts = calculateMoodCounts(analysis.comparison.previous, moods)
+    if (days !== 7 || !analysis?.comparison) return null
+    const current = analysis.comparison.current.filter((entry) => isKnownMood(entry.mood))
+    const previous = analysis.comparison.previous.filter((entry) => isKnownMood(entry.mood))
+    if (current.length < ANALYSIS_THRESHOLDS.weeklyComparisonMinDays
+      || previous.length < ANALYSIS_THRESHOLDS.weeklyComparisonMinDays) {
+      return current.length > previous.length ? `지난주보다 ${current.length - previous.length}일 더 기록했어요` : null
+    }
+    const currentCounts = calculateMoodCounts(current, moods)
+    const previousCounts = calculateMoodCounts(previous, moods)
     const differences = moods.map((mood) => ({ mood, difference: currentCounts[mood] - previousCounts[mood] }))
-      .sort((left, right) => Math.abs(right.difference) - Math.abs(left.difference))
+      .sort((left, right) => Math.abs(right.difference) - Math.abs(left.difference)
+        || Number(right.difference > 0) - Number(left.difference > 0))
     const strongest = differences[0]
     if (!strongest || strongest.difference === 0) {
-      return `지난주와 이번 주 모두 ${analysis.comparison.current.length}일을 기록했고, 감정 구성도 같았어요`
+      return '지난주와 비슷한 한 주였어요'
     }
     const amount = Math.abs(strongest.difference)
     return `지난주보다 ${MOODS[strongest.mood].phrase}이 ${amount}일 ${strongest.difference > 0 ? '늘었어요' : '줄었어요'}`
   })()
-  const streak = currentStreak(analysis?.entries ?? [], today)
+  const streakEntries = (analysis?.streak_entries ?? validEntries).filter((entry) => isKnownMood(entry.mood))
+  const streak = currentStreak(streakEntries, today)
   const sortedMoodStats = moods
-    .filter((mood) => (analysis?.moods[mood].count ?? 0) > 0)
-    .sort((left, right) => (analysis?.moods[right].count ?? 0) - (analysis?.moods[left].count ?? 0))
-  const monthlySummary = topMoods.length === 1
+    .filter((mood) => validStats.moods[mood].count > 0)
+    .sort((left, right) => validStats.moods[right].count - validStats.moods[left].count)
+  const monthlySummary = topMoods.length === 0
+    ? '아직 집계할 수 있는 감정이 없어요'
+    : topMoods.length === 1
     ? `${MOODS[topMoods[0]].phrase}이 제일 많았어요`
     : topMoods.length <= 3
       ? `${topMoods.map((mood) => MOODS[mood].label).join('과 ')}이 가장 많이 나타났어요`
       : '여러 감정이 고르게 나타났어요'
-  const weatherEntries = (analysis?.entries ?? []).filter((entry) => entry.weather)
+  const weatherEntries = validEntries.filter((entry) => entry.weather)
   const weatherStats = weatherOrder.map((group) => {
     const entries = weatherEntries.filter((entry) => entry.weather && weatherGroup(entry.weather.description) === group)
     const counts = Object.fromEntries(moods.map((mood) => [mood, entries.filter((entry) => entry.mood === mood).length])) as Record<Mood, number>
@@ -195,26 +216,26 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
   const displayedWeatherStats: WeatherStat[] = weatherDemo ? demoWeatherStats : weatherStats
   const weatherBaselineCounts = weatherDemo
     ? Object.fromEntries(moods.map((mood) => [mood, displayedWeatherStats.reduce((sum, stat) => sum + stat.counts[mood], 0)])) as Record<Mood, number>
-    : Object.fromEntries(moods.map((mood) => [mood, analysis?.moods[mood].count ?? 0])) as Record<Mood, number>
+    : calculateMoodCounts(weatherEntries, moods)
   const weatherBaselineTotal = weatherDemo
     ? Object.values(weatherBaselineCounts).reduce((sum, count) => sum + count, 0)
-    : analysis?.total ?? 0
+    : weatherEntries.length
   const weatherInsights = findWeatherInsights(displayedWeatherStats, weatherBaselineCounts, weatherBaselineTotal, moods)
-  const primaryWeatherInsight: WeatherInsight | null = weatherInsights[0]?.lift >= .2 ? weatherInsights[0] : null
+  const primaryWeatherInsight: WeatherInsight | null = weatherInsights[0]?.lift >= ANALYSIS_THRESHOLDS.weatherInsightMinLift ? weatherInsights[0] : null
   const secondaryWeatherInsight = primaryWeatherInsight
     ? weatherInsights.find((insight) => insight.group !== primaryWeatherInsight.group)
     : null
-  const displayedEntries = days === 30 && !showAllRecords ? visibleEntries.slice(0, 3) : visibleEntries
-  const usedReasonIds = [...new Set((analysis?.entries ?? []).flatMap((entry) => entry.reason_ids ?? []))]
-  const reasonTaggedEntries = (analysis?.entries ?? []).filter((entry) => (entry.reason_ids?.length ?? 0) > 0)
+  const displayedEntries = days === 30 && !showAllRecords ? visibleEntries.slice(0, ANALYSIS_THRESHOLDS.monthlyInitialRecords) : visibleEntries
+  const usedReasonIds = [...new Set(validEntries.flatMap((entry) => entry.reason_ids ?? []))]
+  const reasonTaggedEntries = validEntries.filter((entry) => (entry.reason_ids?.length ?? 0) > 0)
   const reasonStats = usedReasonIds.map((id) => ({
     id,
     label: reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유',
-    count: (analysis?.entries ?? []).filter((entry) => entry.reason_ids?.includes(id)).length,
+    count: validEntries.filter((entry) => entry.reason_ids?.includes(id)).length,
   })).sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'ko'))
   const topReasonCount = reasonStats[0]?.count ?? 0
   const reasonHeadlineCandidates = moods.flatMap((mood) => {
-    const moodEntries = (analysis?.entries ?? []).filter((entry) => entry.mood === mood)
+    const moodEntries = validEntries.filter((entry) => entry.mood === mood)
     if (moodEntries.length < 4) return []
     return reasonStats.map((reason) => {
       const count = moodEntries.filter((entry) => entry.reason_ids?.includes(reason.id)).length
@@ -222,6 +243,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
     }).filter((candidate) => candidate.count > 0 && candidate.ratio >= .5)
   }).sort((left, right) => right.ratio - left.ratio || right.count - left.count)
   const reasonHeadline = reasonHeadlineCandidates[0]
+  const topReason = reasonStats[0]
 
   useEffect(() => {
     if (!openMenu) return
@@ -252,7 +274,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
   function startEditing(entry: AnalysisResult['entries'][number]) {
     setOpenMenu(null)
     setEditingDate(entry.date)
-    setEditMood(entry.mood)
+    setEditMood(isKnownMood(entry.mood) ? entry.mood : 'neutral')
     setEditNote(entry.note)
     setEditReasonIds(entry.reason_ids ?? [])
   }
@@ -278,7 +300,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
     )
   }
 
-  if (analysis.total === 0) {
+  if (validStats.total === 0 && allEntries.length === 0) {
     const firstEver = hasAnyHistory === false
     const title = firstEver
       ? '첫 마음을 기다리고 있어요'
@@ -324,7 +346,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
           <section className="analysis-checkin-card" aria-label="기록 횟수">
             <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
             <div>
-              <strong>최근 7일 중 {analysis.total}일을 기록했어요</strong>
+              <strong>최근 7일 중 {validStats.total}일을 기록했어요</strong>
               <p>{streak === 7 ? '최근 7일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '오늘의 마음부터 천천히 남겨보세요.'}</p>
             </div>
           </section>
@@ -336,13 +358,13 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             <div className="week-strip">
               {weekDates.map((date) => {
                 const entry = entriesByDate.get(date)
-                const mood = entry ? MOODS[entry.mood] : null
+                const mood = entry && isKnownMood(entry.mood) ? MOODS[entry.mood] : null
                 const value = new Date(`${date}T00:00:00Z`)
                 return (
-                  <div className={`week-day ${entry ? 'recorded' : ''} ${date === today ? 'today' : ''}`} key={date}>
+                  <div className={`week-day ${entry ? 'recorded' : ''} ${entry && !mood ? 'unknown' : ''} ${date === today ? 'today' : ''}`} key={date}>
                     <span>{weekdayLabels[value.getUTCDay()]}</span>
                     <strong style={mood ? { background: mood.color, color: mood.text } : undefined}>{value.getUTCDate()}</strong>
-                    <small>{mood?.label ?? ''}</small>
+                    <small>{entry && !mood ? '알 수 없음' : mood?.label ?? ''}</small>
                   </div>
                 )
               })}
@@ -359,17 +381,17 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
           <section className="analysis-checkin-card" aria-label="기록 횟수">
             <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
             <div>
-              <strong>최근 30일 중 {analysis.total}일을 기록했어요</strong>
+              <strong>최근 30일 중 {validStats.total}일을 기록했어요</strong>
               <p>{streak >= 30 ? '최근 30일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '다시 기록을 시작해도 괜찮아요.'}</p>
             </div>
           </section>
 
           <section className="analysis-month-card" aria-label="최근 30일 감정 요약">
-            <p>30일 동안 {analysis?.total ?? 0}번 기록했어요</p>
+            <p>30일 동안 {validStats.total}번 기록했어요</p>
             <h2>{monthlySummary}</h2>
             <div className="mood-ratio-bar" aria-label="감정별 기록 비율">
               {sortedMoodStats.map((mood) => (
-                <span key={mood} style={{ flex: analysis?.moods[mood].count, background: MOODS[mood].color }} title={`${MOODS[mood].label} ${analysis?.moods[mood].count}회`} />
+                <span key={mood} style={{ flex: validStats.moods[mood].count, background: MOODS[mood].color }} title={`${MOODS[mood].label} ${validStats.moods[mood].count}회`} />
               ))}
             </div>
             <div className="mood-ratio-legend">
@@ -381,7 +403,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                   onClick={() => { setSelectedMood(selectedMood === mood ? null : mood); setSelectedReasonId(null); setShowAllRecords(false) }}
                 >
                   <span><i style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</span>
-                  <strong>{analysis?.moods[mood].count}회</strong>
+                  <strong>{validStats.moods[mood].count}회</strong>
                 </button>
               ))}
             </div>
@@ -394,7 +416,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                 {weatherCollapsed ? '펼치기' : '접기'} <span aria-hidden="true">{weatherCollapsed ? '▾' : '▴'}</span>
               </button>
             </div>
-            {weatherDemo || weatherEntries.length >= 10 ? (
+            {weatherDemo || weatherEntries.length >= ANALYSIS_THRESHOLDS.weatherAnalysisMinEntries ? (
               <>
                 <h2>{primaryWeatherInsight
                   ? `${weatherSubject(primaryWeatherInsight.group)} ${MOODS[primaryWeatherInsight.mood].phrase}이 많았어요`
@@ -431,7 +453,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
               </>
             ) : (
               <>
-                {weatherCollapsed && <h2>{weatherStatus === 'location-error' ? '위치를 허용하면 날씨도 함께 기록돼요' : `날씨 기록 ${weatherEntries.length} / 10`}</h2>}
+                {weatherCollapsed && <h2>{weatherStatus === 'location-error' ? '위치를 허용하면 날씨도 함께 기록돼요' : `날씨 기록 ${weatherEntries.length} / ${ANALYSIS_THRESHOLDS.weatherAnalysisMinEntries}`}</h2>}
                 <div id="weather-analysis-details" hidden={weatherCollapsed}>
                   {weatherStatus === 'location-error' ? (
                     <div className="analysis-weather-permission">
@@ -440,11 +462,11 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                     </div>
                   ) : (
                     <div className="analysis-coming-soon weather-progress">
-                      <strong>날씨 기록 {weatherEntries.length} / 10</strong>
+                      <strong>날씨 기록 {weatherEntries.length} / {ANALYSIS_THRESHOLDS.weatherAnalysisMinEntries}</strong>
                       <p>
                         <span>날씨는 <b>오늘 날짜의 기록</b>을 저장할 때 자동으로 함께 저장돼요.</span>
                         <span>지난 날짜의 기록에는 날씨가 저장되지 않아요.</span>
-                        <span>10개가 모이면 날씨와 마음의 관계를 알려드릴게요.</span>
+                        <span>{ANALYSIS_THRESHOLDS.weatherAnalysisMinEntries}개가 모이면 날씨와 마음의 관계를 알려드릴게요.</span>
                       </p>
                     </div>
                   )}
@@ -475,7 +497,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                 <>
                   <h2>{reasonHeadline
                     ? `${MOODS[reasonHeadline.mood].phrase} ${reasonHeadline.moodTotal}일 중 ${reasonHeadline.count}일이 ${reasonHeadline.reason.label} 때문이었어요`
-                    : '감정에 따라 반복되는 이유는 아직 뚜렷하지 않아요'}</h2>
+                    : topReason ? `${withObjectParticle(topReason.label)} 가장 자주 골랐어요` : '감정에 따라 반복되는 이유는 아직 뚜렷하지 않아요'}</h2>
                   <div id="reason-analysis-details" hidden={reasonsCollapsed}>
                     <div className="reason-analysis-list">
                       {reasonStats.map((reason) => (
@@ -520,16 +542,20 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
         {loading ? (
           <p>기록을 불러오고 있어요.</p>
         ) : visibleEntries.length === 0 ? (
-          <p>{days === 7 && (analysis?.total ?? 0) === 0
+          <p>{days === 7 && validStats.total === 0
             ? '첫 마음을 기록하면 이곳에서 한 주를 돌아볼 수 있어요.'
             : '아직 표시할 기록이 없어요.'}</p>
         ) : (
           <>
-          {displayedEntries.map((entry) => (
+          {displayedEntries.map((entry) => {
+            const knownMood = isKnownMood(entry.mood) ? entry.mood : null
+            return (
             <article key={entry.date}>
-              <div className="record-mood">
-                <MoodIcon mood={entry.mood} size={24} />
-                <strong>{MOODS[entry.mood].label}</strong>
+              <div className={`record-mood ${knownMood ? '' : 'unknown'}`}>
+                {knownMood
+                  ? <MoodIcon mood={knownMood} size={24} />
+                  : <span className="unknown-mood-icon" aria-hidden="true" />}
+                <strong>{knownMood ? MOODS[knownMood].label : '알 수 없는 감정'}</strong>
                 {!!entry.reason_ids?.length && (
                   <span className="record-reasons">
                     {entry.reason_ids.map((id) => <small key={id}>{reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유'}</small>)}
@@ -600,10 +626,11 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                 </form>
               )}
             </article>
-          ))}
-          {days === 30 && visibleEntries.length > 3 && (
+            )
+          })}
+          {days === 30 && visibleEntries.length > ANALYSIS_THRESHOLDS.monthlyInitialRecords && (
             <button type="button" className="show-more-records" onClick={() => setShowAllRecords(!showAllRecords)}>
-              {showAllRecords ? '접기' : `더 보기 (${visibleEntries.length - 3}개)`}
+              {showAllRecords ? '접기' : `더 보기 (${visibleEntries.length - ANALYSIS_THRESHOLDS.monthlyInitialRecords}개)`}
             </button>
           )}
           </>

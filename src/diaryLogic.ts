@@ -139,14 +139,19 @@ export function validateBackup(value: unknown): Backup {
 
 export function calculateStats(entries: Entry[]): Stats {
   const counts = Object.fromEntries(MOOD_VALUES.map((mood) => [mood, 0])) as Record<Mood, number>
-  for (const entry of entries) counts[entry.mood] += 1
+  const validEntries = entries.filter((entry) => isKnownMood(entry.mood))
+  for (const entry of validEntries) counts[entry.mood] += 1
   return {
-    total: entries.length,
+    total: validEntries.length,
     moods: Object.fromEntries(MOOD_VALUES.map((mood) => [mood, {
       count: counts[mood],
-      percentage: entries.length ? Math.round((counts[mood] / entries.length) * 100) : 0,
+      percentage: validEntries.length ? Math.round((counts[mood] / validEntries.length) * 100) : 0,
     }])) as Stats['moods'],
   }
+}
+
+export function isKnownMood(value: unknown): value is Mood {
+  return MOOD_VALUES.includes(value as Mood)
 }
 
 function shiftDate(date: string, amount: number) {

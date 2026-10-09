@@ -7,7 +7,9 @@
     "dev": "concurrently -k -n server,web -c blue,magenta \"node --watch server/index.js\" \"vite\"",
     "build": "tsc -b && vite build",
     "start": "node server/index.js",
-    "test": "node --experimental-strip-types --test tests/diary-logic.test.ts",
+    "test": "npm run test:logic && npm run test:ui",
+    "test:logic": "node --experimental-strip-types --test tests/diary-logic.test.ts",
+    "test:ui": "vitest run",
     "test:legacy": "node --test server/**/*.test.js",
     "test:rules": "npx --yes firebase-tools@latest emulators:exec --only firestore \"node --test tests/firestore-rules.test.js\"",
     "worker:dev": "npx wrangler dev --config worker/wrangler.toml",
@@ -23,13 +25,18 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/express": "^5.0.3",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^9.2.1",
+    "jsdom": "^30.1.2",
     "supertest": "^7.1.4",
     "typescript": "~5.9.3",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^5.0.3"
   }
 }

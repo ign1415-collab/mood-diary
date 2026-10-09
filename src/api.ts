@@ -144,14 +144,10 @@ export function createDiaryApi(uid: string) {
     async analysis(days: 7 | 30): Promise<AnalysisResult> {
       const today = new Date()
       const end = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-      const startDate = new Date(`${end}T00:00:00Z`)
-      startDate.setUTCDate(startDate.getUTCDate() - (days === 7 ? 14 : days - 1))
-      const start = startDate.toISOString().slice(0, 10)
       const generation = await currentGeneration(uid)
       const result = await getDocs(query(
         entriesRef(uid, generation),
         orderBy(documentId()),
-        startAt(start),
         endAt(end),
       ))
       const pool = result.docs.map((snapshot) => entryFromDocument(snapshot.id, snapshot.data())).reverse()
@@ -160,8 +156,8 @@ export function createDiaryApi(uid: string) {
       const displayStartValue = displayStart.toISOString().slice(0, 10)
       const entries = pool.filter((entry) => entry.date >= displayStartValue)
       return days === 7
-        ? { days, ...calculateStats(entries), entries, comparison: sevenDayComparison(pool, end), comparison_pool: pool }
-        : { days, ...calculateStats(entries), entries }
+        ? { days, ...calculateStats(entries), entries, streak_entries: pool, comparison: sevenDayComparison(pool, end), comparison_pool: pool }
+        : { days, ...calculateStats(entries), entries, streak_entries: pool }
     },
 
     async save(date: string, entry: { mood: Mood; note: string; reason_ids?: string[]; weather?: WeatherSnapshot }) {

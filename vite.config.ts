@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
@@ -8,5 +8,12 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001',
     },
+  },
+  test: {
+    environment: 'jsdom',
+    environmentOptions: { jsdom: { url: 'https://mymooddiary.web.app/' } },
+    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.tsx'],
+    restoreMocks: true,
   },
 })
