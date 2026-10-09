@@ -253,7 +253,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
               </div>
               <div className="reason-tools">
                 <button type="button" onClick={() => { setCustomOpen((open) => !open); setManagingTags(false); setReasonError('') }}>+ 직접 추가</button>
-                <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>태그 정리</button>
+                <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>수정·삭제</button>
               </div>
               {customOpen && (
                 <div className="reason-custom-form">
