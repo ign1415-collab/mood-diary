@@ -171,7 +171,7 @@ export function createDiaryApi(uid: string) {
       const firestore = requireDb()
       const generation = await currentGeneration(uid)
       const entryRef = doc(entriesRef(uid, generation), date)
-      await runTransaction(firestore, async (transaction) => {
+      return runTransaction(firestore, async (transaction) => {
         const snapshot = await transaction.get(entryRef)
         const previousWeather = snapshot.data()?.weather
         const previousReasonIds = snapshot.data()?.reasonIds
@@ -182,19 +182,28 @@ export function createDiaryApi(uid: string) {
           ...(entry.weather.location ? { location: entry.weather.location } : {}),
           ...(entry.weather.observed_at ? { observedAt: Timestamp.fromDate(new Date(entry.weather.observed_at)) } : {}),
         } : previousWeather
+        const reasonIds = entry.reason_ids !== undefined
+          ? entry.reason_ids
+          : Array.isArray(previousReasonIds) ? previousReasonIds : []
+        const now = Timestamp.now()
+        const createdAt = snapshot.data()?.createdAt instanceof Timestamp ? snapshot.data()!.createdAt : now
         transaction.set(entryRef, {
           mood: entry.mood,
           note: entry.note.trim(),
-          ...(entry.reason_ids !== undefined
-            ? { reasonIds: entry.reason_ids }
-            : Array.isArray(previousReasonIds) ? { reasonIds: previousReasonIds } : {}),
+          ...(reasonIds.length ? { reasonIds } : {}),
           ...(weather ? { weather } : {}),
           createdAt: snapshot.data()?.createdAt ?? serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
+        return entryFromDocument(date, {
+          mood: entry.mood,
+          note: entry.note.trim(),
+          ...(reasonIds.length ? { reasonIds } : {}),
+          ...(weather ? { weather } : {}),
+          createdAt,
+          updatedAt: now,
+        })
       })
-      const saved = await getDoc(entryRef)
-      return entryFromDocument(saved.id, saved.data()!)
     },
 
     async remove(date: string) {

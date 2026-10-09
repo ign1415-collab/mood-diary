@@ -297,9 +297,10 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
       const weatherToSave = selectedDate === today
         ? (!selectedEntry?.weather ? weather ?? undefined : undefined)
         : value.weather
+      let savedEntry: Entry
       if (PREVIEW_MODE) {
         const now = new Date().toISOString()
-        writePreviewChange(userId, selectedDate, {
+        savedEntry = {
           date: selectedDate,
           mood: value.mood,
           note: value.note.trim(),
@@ -307,11 +308,15 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
           ...(weatherToSave || selectedEntry?.weather ? { weather: weatherToSave ?? selectedEntry?.weather } : {}),
           created_at: selectedEntry?.created_at ?? now,
           updated_at: now,
-        })
+        }
+        writePreviewChange(userId, selectedDate, savedEntry)
       } else {
-        await api.save(selectedDate, { ...value, weather: weatherToSave })
+        savedEntry = await api.save(selectedDate, { ...value, weather: weatherToSave })
       }
-      await loadMonth(month)
+      setEntries((current) => [
+        ...current.filter((entry) => entry.date !== savedEntry.date),
+        savedEntry,
+      ].sort((a, b) => a.date.localeCompare(b.date)))
       setNoteClearKey((key) => key + 1)
       setNotice({
         kind: 'success',
