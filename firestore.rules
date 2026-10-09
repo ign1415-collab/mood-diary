@@ -60,6 +60,15 @@ service cloud.firestore {
         && request.resource.data.updatedAt <= request.time;
     }
 
+    function isDefaultReasonTag(tagId) {
+      return tagId in ['person', 'sleep', 'health', 'study', 'work'];
+    }
+
+    function validReasonTagIdentity(tagId) {
+      return (isDefaultReasonTag(tagId) && request.resource.data.builtIn == true)
+        || (!isDefaultReasonTag(tagId) && request.resource.data.builtIn == false);
+    }
+
     match /users/{userId} {
       allow read: if signedInAs(userId);
       allow create: if signedInAs(userId)
@@ -75,8 +84,15 @@ service cloud.firestore {
 
       match /reasonTags/{tagId} {
         allow read: if signedInAs(userId);
-        allow create, update: if signedInAs(userId) && validReasonTag(tagId);
-        allow delete: if false;
+        allow create: if signedInAs(userId)
+          && validReasonTag(tagId)
+          && validReasonTagIdentity(tagId);
+        allow update: if signedInAs(userId)
+          && validReasonTag(tagId)
+          && validReasonTagIdentity(tagId)
+          && request.resource.data.builtIn == resource.data.builtIn
+          && (!resource.data.builtIn || request.resource.data.label == resource.data.label);
+        allow delete: if signedInAs(userId) && resource.data.builtIn == false;
       }
 
       match /diaries/{generationId} {

@@ -15,9 +15,11 @@ interface Props {
   onSave: (value: { mood: Mood; note: string; reason_ids: string[]; weather?: WeatherSnapshot }) => Promise<boolean>
   onCreateReasonTag: (label: string) => Promise<ReasonTag>
   onSetReasonTagActive: (id: string, active: boolean) => Promise<void>
+  onRenameReasonTag: (id: string, label: string) => Promise<void>
+  onDeleteReasonTag: (id: string) => Promise<void>
 }
 
-export function EntryForm({ date, today, entry, weather, saving, noteClearKey, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive }: Props) {
+export function EntryForm({ date, today, entry, weather, saving, noteClearKey, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive, onRenameReasonTag, onDeleteReasonTag }: Props) {
   const [mood, setMood] = useState<Mood | null>(null)
   const [note, setNote] = useState('')
   const [selectedReasonIds, setSelectedReasonIds] = useState<string[]>([])
@@ -25,6 +27,8 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [managingTags, setManagingTags] = useState(false)
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
   const [reasonError, setReasonError] = useState('')
   const [tagSaving, setTagSaving] = useState(false)
   const [moodError, setMoodError] = useState(false)
@@ -38,6 +42,8 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
     setCustomOpen(false)
     setCustomLabel('')
     setManagingTags(false)
+    setEditingTagId(null)
+    setEditingLabel('')
     setReasonError('')
     setMoodError(false)
   }, [date, entry])
@@ -52,7 +58,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   const formattedDate = new Intl.DateTimeFormat('ko-KR', {
     month: 'long', day: 'numeric', weekday: 'long', timeZone: 'UTC',
   }).format(new Date(`${date}T00:00:00Z`))
-  const question = date === today ? '오늘의 기분은 어때요?' : '이날의 마음은 어땠어요?'
+  const question = date === today ? '오늘의 마음은 어때요?' : '이날의 마음은 어땠어요?'
   const availableReasonTags = reasonTags.filter((tag) => tag.active || selectedReasonIds.includes(tag.id))
 
   function toggleReason(id: string) {
@@ -105,6 +111,57 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
       if (tag.active) setSelectedReasonIds((current) => current.filter((id) => id !== tag.id))
     } catch {
       setReasonError('이유 설정을 바꾸지 못했어요. 잠시 후 다시 해 주세요.')
+    } finally {
+      setTagSaving(false)
+    }
+  }
+
+  function startRenaming(tag: ReasonTag) {
+    setEditingTagId(tag.id)
+    setEditingLabel(tag.label)
+    setReasonError('')
+  }
+
+  async function renameTag(tag: ReasonTag) {
+    const label = editingLabel.trim()
+    if (!label) {
+      setReasonError('이유 이름을 입력해 주세요.')
+      return
+    }
+    if ([...label].length > MAX_REASON_LABEL_LENGTH) {
+      setReasonError(`이유 이름은 ${MAX_REASON_LABEL_LENGTH}자까지 쓸 수 있어요.`)
+      return
+    }
+    if (reasonTags.some((item) => item.id !== tag.id && item.label === label)) {
+      setReasonError('이미 같은 이름의 이유가 있어요.')
+      return
+    }
+    setTagSaving(true)
+    setReasonError('')
+    try {
+      await onRenameReasonTag(tag.id, label)
+      setEditingTagId(null)
+      setEditingLabel('')
+    } catch {
+      setReasonError('이유 이름을 수정하지 못했어요. 잠시 후 다시 해 주세요.')
+    } finally {
+      setTagSaving(false)
+    }
+  }
+
+  async function deleteTag(tag: ReasonTag) {
+    if (!window.confirm(`“${tag.label}” 이유를 삭제할까요? 기존 기록에서도 이 이유가 제거돼요.`)) return
+    setTagSaving(true)
+    setReasonError('')
+    try {
+      await onDeleteReasonTag(tag.id)
+      setSelectedReasonIds((current) => current.filter((id) => id !== tag.id))
+      if (editingTagId === tag.id) {
+        setEditingTagId(null)
+        setEditingLabel('')
+      }
+    } catch {
+      setReasonError('이유를 삭제하지 못했어요. 잠시 후 다시 해 주세요.')
     } finally {
       setTagSaving(false)
     }
@@ -220,8 +277,42 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
                 <div className="reason-manage-list">
                   {reasonTags.map((tag) => (
                     <div key={tag.id}>
-                      <span>{tag.label}{tag.built_in && <small>기본</small>}</span>
-                      <button type="button" disabled={tagSaving} onClick={() => void toggleTagActive(tag)}>{tag.active ? '숨기기' : '다시 표시'}</button>
+                      {editingTagId === tag.id ? (
+                        <div className="reason-rename-form">
+                          <input
+                            value={editingLabel}
+                            maxLength={MAX_REASON_LABEL_LENGTH}
+                            aria-label={`${tag.label} 이유 이름 수정`}
+                            onChange={(event) => { setEditingLabel(event.target.value); setReasonError('') }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault()
+                                void renameTag(tag)
+                              }
+                              if (event.key === 'Escape') {
+                                setEditingTagId(null)
+                                setEditingLabel('')
+                              }
+                            }}
+                          />
+                          <button type="button" disabled={tagSaving} onClick={() => void renameTag(tag)}>저장</button>
+                          <button type="button" disabled={tagSaving} onClick={() => { setEditingTagId(null); setEditingLabel('') }}>취소</button>
+                        </div>
+                      ) : (
+                        <>
+                          <span>{tag.label}{tag.built_in && <small>기본</small>}</span>
+                          <div className="reason-manage-actions">
+                            {tag.built_in ? (
+                              <button type="button" disabled={tagSaving} onClick={() => void toggleTagActive(tag)}>{tag.active ? '숨기기' : '다시 표시'}</button>
+                            ) : (
+                              <>
+                                <button type="button" disabled={tagSaving} onClick={() => startRenaming(tag)}>수정</button>
+                                <button type="button" className="danger" disabled={tagSaving} onClick={() => void deleteTag(tag)}>삭제</button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>

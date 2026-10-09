@@ -72,6 +72,16 @@ function writePreviewChange(userId: string, date: string, entry: Entry | null) {
   window.localStorage.setItem(previewStorageKey(userId), JSON.stringify(changes))
 }
 
+function removePreviewReason(userId: string, reasonId: string) {
+  const changes = readPreviewChanges(userId)
+  for (const [date, entry] of Object.entries(changes)) {
+    if (!entry?.reason_ids?.includes(reasonId)) continue
+    const reasonIds = entry.reason_ids.filter((id) => id !== reasonId)
+    changes[date] = { ...entry, ...(reasonIds.length ? { reason_ids: reasonIds } : { reason_ids: undefined }) }
+  }
+  window.localStorage.setItem(previewStorageKey(userId), JSON.stringify(changes))
+}
+
 function mergePreviewEntries(userId: string, baseEntries: Entry[], includesDate: (date: string) => boolean) {
   const merged = new Map(baseEntries.map((entry) => [entry.date, entry]))
   for (const [date, entry] of Object.entries(readPreviewChanges(userId))) {
@@ -195,7 +205,7 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
   }, [activeTab, analysisDays, loadAnalysis])
   useEffect(() => {
     if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), 4000)
+    const timer = window.setTimeout(() => setNotice(null), notice.kind === 'success' ? 1500 : 4000)
     return () => window.clearTimeout(timer)
   }, [notice])
 
@@ -254,6 +264,31 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
       if (PREVIEW_MODE) writePreviewReasonTags(userId, next)
       return next
     })
+  }
+
+  async function renameReasonTag(id: string, label: string) {
+    const normalized = label.trim()
+    if (!PREVIEW_MODE) await api.renameReasonTag(id, normalized)
+    setReasonTags((current) => {
+      const now = new Date().toISOString()
+      const next = current.map((tag) => tag.id === id ? { ...tag, label: normalized, updated_at: now } : tag)
+      if (PREVIEW_MODE) writePreviewReasonTags(userId, next)
+      return next
+    })
+  }
+
+  async function deleteReasonTag(id: string) {
+    if (PREVIEW_MODE) {
+      removePreviewReason(userId, id)
+    } else {
+      await api.deleteReasonTag(id)
+    }
+    setReasonTags((current) => {
+      const next = current.filter((tag) => tag.id !== id)
+      if (PREVIEW_MODE) writePreviewReasonTags(userId, next)
+      return next
+    })
+    await Promise.all([loadMonth(month), activeTab === 'analysis' ? loadAnalysis(analysisDays) : Promise.resolve()])
   }
 
   async function save(value: { mood: Mood; note: string; reason_ids: string[]; weather?: WeatherSnapshot }) {
@@ -360,7 +395,7 @@ export default function App({ userId, userEmail, onSignOut }: AppProps) {
           <div className="home-page">
             <div className="home-stack">
               <Calendar month={month} entries={entries} selectedDate={selectedDate} today={today} onMonthChange={setMonth} onSelect={selectDate} />
-              <EntryForm date={selectedDate} today={today} entry={selectedEntry} weather={weather} reasonTags={reasonTags} saving={saving} noteClearKey={noteClearKey} onCreateReasonTag={createReasonTag} onSetReasonTagActive={setReasonTagActive} onSave={save} />
+              <EntryForm date={selectedDate} today={today} entry={selectedEntry} weather={weather} reasonTags={reasonTags} saving={saving} noteClearKey={noteClearKey} onCreateReasonTag={createReasonTag} onSetReasonTagActive={setReasonTagActive} onRenameReasonTag={renameReasonTag} onDeleteReasonTag={deleteReasonTag} onSave={save} />
             </div>
           </div>
         ) : (
