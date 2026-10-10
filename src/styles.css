@@ -44,6 +44,7 @@
 }
 
 :root {
+  color-scheme: only light;
   font-family: 'IBM Plex Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
   color: #262033;
   background: #e8e6ee;
