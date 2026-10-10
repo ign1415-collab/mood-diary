@@ -22,7 +22,9 @@ export function watchTheme(preference: ThemePreference, onChange?: (theme: Resol
   const apply = () => {
     const resolved = resolveTheme(preference, media?.matches ?? false)
     document.documentElement.dataset.theme = resolved
-    document.documentElement.style.colorScheme = resolved
+    // `only` prevents mobile browsers from applying their own forced-dark
+    // conversion on top of the app theme (which can wash out SVG faces).
+    document.documentElement.style.colorScheme = `only ${resolved}`
     document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.setAttribute('content', resolved)
     onChange?.(resolved)
   }
@@ -37,6 +39,6 @@ export function restoreSystemTheme() {
   const systemDark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
   const resolved = resolveTheme('system', systemDark)
   document.documentElement.dataset.theme = resolved
-  document.documentElement.style.colorScheme = resolved
+  document.documentElement.style.colorScheme = `only ${resolved}`
   document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.setAttribute('content', 'light dark')
 }

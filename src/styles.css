@@ -44,7 +44,7 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: only light;
   font-family: 'IBM Plex Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
   color: #262033;
   background: #e8e6ee;
@@ -83,7 +83,7 @@
 }
 
 :root[data-theme='dark'] {
-  color-scheme: dark;
+  color-scheme: only dark;
   color: #edeaf3;
   background: #0f0e13;
   --page-bg: #0f0e13;
@@ -306,7 +306,8 @@ fieldset { border: 0; margin: 0; padding: 0; }
   position: relative; min-height: 76px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
   border: 1.5px solid transparent; border-radius: 12px; background: var(--card); transition: background .15s, border-color .15s;
 }
-.mood-icon { display: block; flex: 0 0 auto; }
+.mood-icon { display: block; flex: 0 0 auto; forced-color-adjust: none; }
+:root[data-theme='dark'] .mood-icon path { stroke-width: 2.2; }
 .mood-choice strong { font-size: 13px; }
 .mood-option:hover .mood-choice { border-color: var(--mood-color); }
 .mood-option input:checked + .mood-choice { color: var(--mood-text); background: var(--mood-soft); border-color: var(--mood-border, var(--mood-text)); }
