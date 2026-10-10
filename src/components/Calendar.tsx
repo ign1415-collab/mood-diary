@@ -1,5 +1,6 @@
 import type { Entry, Mood } from '../types'
 import { MOODS } from '../types'
+import { isKnownMood } from '../diaryLogic'
 
 interface Props {
   month: string
@@ -51,16 +52,18 @@ export function Calendar({ month, entries, selectedDate, today, onMonthChange, o
           const date = `${month}-${String(day).padStart(2, '0')}`
           const entry = byDate.get(date)
           const disabled = date > today
-          const mood = entry ? MOODS[entry.mood] : null
+          const knownMood = entry && isKnownMood(entry.mood) ? entry.mood : null
+          const mood = knownMood ? MOODS[knownMood] : null
+          const unknownMood = Boolean(entry && !knownMood)
           return (
             <button
               type="button"
-              className={`date-cell ${date === selectedDate ? 'selected' : ''} ${date === today ? 'today' : ''} ${entry ? 'has-entry' : ''}`}
+              className={`date-cell ${date === selectedDate ? 'selected' : ''} ${date === today ? 'today' : ''} ${entry ? 'has-entry' : ''} ${unknownMood ? 'unknown-mood' : ''}`}
               key={date}
               disabled={disabled}
               onClick={() => onSelect(date)}
               style={mood ? { backgroundColor: mood.color, color: mood.text } : undefined}
-              aria-label={`${value}월 ${day}일${entry ? `, ${mood?.label}` : ', 기록 없음'}`}
+              aria-label={`${value}월 ${day}일${entry ? `, ${mood?.label ?? '알 수 없는 감정'}` : ', 기록 없음'}`}
               aria-pressed={date === selectedDate}
             >
               <span>{day}</span>

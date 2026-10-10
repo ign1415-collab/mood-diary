@@ -92,7 +92,7 @@ service cloud.firestore {
           && validReasonTagIdentity(tagId)
           && request.resource.data.builtIn == resource.data.builtIn
           && (!resource.data.builtIn || request.resource.data.label == resource.data.label);
-        allow delete: if signedInAs(userId) && resource.data.builtIn == false;
+        allow delete: if false;
       }
 
       match /diaries/{generationId} {

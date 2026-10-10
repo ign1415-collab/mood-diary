@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import type { Entry, Mood, ReasonTag, WeatherSnapshot } from '../types'
-import { MAX_NOTE_LENGTH, MAX_REASON_IDS, MAX_REASON_LABEL_LENGTH } from '../diaryLogic'
+import { isKnownMood, MAX_NOTE_LENGTH, MAX_REASON_IDS, MAX_REASON_LABEL_LENGTH } from '../diaryLogic'
 import { MOODS } from '../types'
 import { MoodIcon } from './MoodIcon'
 
@@ -16,10 +16,9 @@ interface Props {
   onCreateReasonTag: (label: string) => Promise<ReasonTag>
   onSetReasonTagActive: (id: string, active: boolean) => Promise<void>
   onRenameReasonTag: (id: string, label: string) => Promise<void>
-  onDeleteReasonTag: (id: string) => Promise<void>
 }
 
-export function EntryForm({ date, today, entry, weather, saving, noteClearKey, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive, onRenameReasonTag, onDeleteReasonTag }: Props) {
+export function EntryForm({ date, today, entry, weather, saving, noteClearKey, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive, onRenameReasonTag }: Props) {
   const [mood, setMood] = useState<Mood | null>(null)
   const [note, setNote] = useState('')
   const [selectedReasonIds, setSelectedReasonIds] = useState<string[]>([])
@@ -35,7 +34,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   const lastNoteClearKey = useRef(noteClearKey)
 
   useEffect(() => {
-    setMood(entry?.mood ?? null)
+    setMood(entry && isKnownMood(entry.mood) ? entry.mood : null)
     setNote(entry?.note ?? '')
     setSelectedReasonIds(entry?.reason_ids ?? [])
     setReasonsOpen((entry?.reason_ids?.length ?? 0) > 0)
@@ -149,19 +148,19 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
     }
   }
 
-  async function deleteTag(tag: ReasonTag) {
-    if (!window.confirm(`“${tag.label}” 이유를 삭제할까요? 기존 기록에서도 이 이유가 제거돼요.`)) return
+  async function deactivateTag(tag: ReasonTag) {
+    if (!window.confirm(`“${tag.label}” 이유를 숨길까요? 새 기록의 선택지에서는 사라지지만, 예전 기록과 통계에는 그대로 남아요.`)) return
     setTagSaving(true)
     setReasonError('')
     try {
-      await onDeleteReasonTag(tag.id)
+      await onSetReasonTagActive(tag.id, false)
       setSelectedReasonIds((current) => current.filter((id) => id !== tag.id))
       if (editingTagId === tag.id) {
         setEditingTagId(null)
         setEditingLabel('')
       }
     } catch {
-      setReasonError('이유를 삭제하지 못했어요. 잠시 후 다시 해 주세요.')
+      setReasonError('이유를 숨기지 못했어요. 잠시 후 다시 해 주세요.')
     } finally {
       setTagSaving(false)
     }
@@ -253,7 +252,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
               </div>
               <div className="reason-tools">
                 <button type="button" onClick={() => { setCustomOpen((open) => !open); setManagingTags(false); setReasonError('') }}>+ 직접 추가</button>
-                <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>수정·삭제</button>
+                <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>수정·숨기기</button>
               </div>
               {customOpen && (
                 <div className="reason-custom-form">
@@ -307,7 +306,9 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
                             ) : (
                               <>
                                 <button type="button" disabled={tagSaving} onClick={() => startRenaming(tag)}>수정</button>
-                                <button type="button" className="danger" disabled={tagSaving} onClick={() => void deleteTag(tag)}>삭제</button>
+                                {tag.active
+                                  ? <button type="button" disabled={tagSaving} onClick={() => void deactivateTag(tag)}>숨기기</button>
+                                  : <button type="button" disabled={tagSaving} onClick={() => void toggleTagActive(tag)}>다시 표시</button>}
                               </>
                             )}
                           </div>

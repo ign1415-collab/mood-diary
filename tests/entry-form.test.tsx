@@ -26,7 +26,6 @@ function renderForm(options: { date?: string; entry?: Entry; weather?: WeatherSn
     onCreateReasonTag: vi.fn(async (label: string) => ({ id: 'custom-new', label, active: true, built_in: false, created_at: timestamp, updated_at: timestamp })),
     onSetReasonTagActive: vi.fn(async () => undefined),
     onRenameReasonTag: vi.fn(async () => undefined),
-    onDeleteReasonTag: vi.fn(async () => undefined),
   }
   const view = render(
     <EntryForm
@@ -158,7 +157,7 @@ describe('이유 태그 입력과 관리', () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: /이유 추가/ }))
-    await user.click(screen.getByRole('button', { name: '수정·삭제' }))
+    await user.click(screen.getByRole('button', { name: '수정·숨기기' }))
     const manageList = document.querySelector('.reason-manage-list') as HTMLElement
     const health = within(manageList).getByText('건강').closest('div')!
     expect(within(health).getByRole('button', { name: '숨기기' })).toBeInTheDocument()
@@ -185,14 +184,18 @@ describe('이유 태그 입력과 관리', () => {
     expect(screen.queryByText('이미 있는 이유예요.')).not.toBeInTheDocument()
   })
 
-  test('직접 만든 태그에만 수정·삭제 동작이 제공된다', async () => {
+  test('R5 직접 만든 태그는 삭제하지 않고 비활성화한다', async () => {
     const user = userEvent.setup()
-    renderForm()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { onSetReasonTagActive } = renderForm()
     await user.click(screen.getByRole('button', { name: /이유 추가/ }))
-    await user.click(screen.getByRole('button', { name: '수정·삭제' }))
+    await user.click(screen.getByRole('button', { name: '수정·숨기기' }))
     const manageList = document.querySelector('.reason-manage-list') as HTMLElement
     const custom = within(manageList).getByText('친구랑싸움').closest('div')!
     expect(within(custom).getByRole('button', { name: '수정' })).toBeInTheDocument()
-    expect(within(custom).getByRole('button', { name: '삭제' })).toBeInTheDocument()
+    await user.click(within(custom).getByRole('button', { name: '숨기기' }))
+    expect(confirm).toHaveBeenCalledWith('“친구랑싸움” 이유를 숨길까요? 새 기록의 선택지에서는 사라지지만, 예전 기록과 통계에는 그대로 남아요.')
+    expect(onSetReasonTagActive).toHaveBeenCalledWith('custom-fight', false)
+    expect(within(custom).queryByRole('button', { name: '삭제' })).not.toBeInTheDocument()
   })
 })

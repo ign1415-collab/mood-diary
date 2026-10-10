@@ -235,6 +235,22 @@ describe('기록 횟수와 빈 상태', () => {
     expect(screen.getByText('지금 13일째 이어서 기록하고 있어요.')).toBeInTheDocument()
   })
 
+  test('S10 9일 연속이면 7일 탭에서도 실제 9일을 표시한다', () => {
+    const fullStreak = makeEntries(TODAY, Array.from({ length: 9 }, () => 'happy' as Mood))
+    const sevenDayEntries = fullStreak.filter((item) => item.date >= '2026-10-03')
+    renderPanel(result(7, sevenDayEntries, undefined, fullStreak))
+    expect(screen.getByText('지금 9일째 이어서 기록하고 있어요.')).toBeInTheDocument()
+    expect(screen.queryByText('최근 7일을 빠짐없이 기록했어요.')).not.toBeInTheDocument()
+  })
+
+  test('S11 35일 연속이면 30일 탭에서도 실제 35일을 표시한다', () => {
+    const fullStreak = makeEntries(TODAY, Array.from({ length: 35 }, () => 'happy' as Mood))
+    const thirtyDayEntries = fullStreak.filter((item) => item.date >= '2026-09-10')
+    renderPanel(result(30, thirtyDayEntries, undefined, fullStreak))
+    expect(screen.getByText('지금 35일째 이어서 기록하고 있어요.')).toBeInTheDocument()
+    expect(screen.queryByText('최근 30일을 빠짐없이 기록했어요.')).not.toBeInTheDocument()
+  })
+
   test('S6 어제와 오늘 기록이 없으면 연속·끊김 문구가 없다', () => {
     renderPanel(result(7, [entry('2026-10-05', 'happy')]))
     expect(screen.queryByText(/이어|끊겼/)).not.toBeInTheDocument()
@@ -377,6 +393,17 @@ describe('날씨 저장값 분류와 날씨별 분석', () => {
     expect(screen.getByText('흐린 8일 중 4일은 보통이었어요.')).toBeInTheDocument()
   })
 
+  test('WA2 둘째 후보가 20%p 미만이면 근거 둘째 줄을 표시하지 않는다', () => {
+    const data = [
+      ...['tired', 'tired', 'happy', 'happy'].map((mood, index) => entry(shiftDate(TODAY, -index), mood as Mood, { weather: weather('비') })),
+      ...['happy', 'happy', 'happy', 'happy', 'neutral', 'neutral'].map((mood, index) => entry(shiftDate(TODAY, -index - 4), mood as Mood, { weather: weather('맑음') })),
+    ]
+    renderPanel(result(30, data))
+    expect(screen.getByRole('heading', { name: '비 오는 날엔 피곤한 날이 많았어요' })).toBeInTheDocument()
+    expect(screen.queryByText('맑은 6일 중 4일은 행복했어요.')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.weather-insight-evidence p')).toHaveLength(1)
+  })
+
   test('WA3 4일 미만 날씨는 문장 후보에서 빠진다', () => {
     const data = [...weatherDataA(), entry('2026-09-13', 'happy', { weather: weather('눈') }), entry('2026-09-12', 'happy', { weather: weather('눈') })]
     renderPanel(result(30, data))
@@ -474,9 +501,10 @@ describe('기존 데이터와 이유 통계', () => {
     expect(screen.getByText('알 수 없는 감정').closest('.record-mood')).toHaveClass('unknown')
   })
 
-  test('R8 이유 기록이 0개면 자주 고른 이유 카드를 숨긴다', () => {
+  test('R8 이유 기록이 0개면 이유 기록 진행 상황을 보여준다', () => {
     renderPanel(result(30, makeEntries(TODAY, ['happy', 'calm', 'neutral'])))
-    expect(screen.queryByLabelText('자주 고른 이유')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('자주 고른 이유')).toBeInTheDocument()
+    expect(screen.getByText('이유 기록 0 / 10')).toBeInTheDocument()
   })
 
   test('R9 감정 기록이 3개뿐이면 감정별 단정 대신 횟수 중심 문구다', () => {

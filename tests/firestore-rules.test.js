@@ -86,12 +86,13 @@ describe('Firestore 사용자별 보안 규칙', () => {
     await assertFails(deleteDoc(health))
   })
 
-  test('직접 만든 이유만 이름 변경·삭제할 수 있다', async () => {
+  test('직접 만든 이유는 이름 변경·비활성화만 가능하고 삭제할 수 없다', async () => {
     const alice = environment.authenticatedContext('alice').firestore()
     const custom = doc(alice, 'users/alice/reasonTags/custom-test')
     const now = Timestamp.now()
     await assertSucceeds(setDoc(custom, { label: '운동', active: true, builtIn: false, createdAt: now, updatedAt: now }))
     await assertSucceeds(updateDoc(custom, { label: '헬스', updatedAt: Timestamp.now() }))
-    await assertSucceeds(deleteDoc(custom))
+    await assertSucceeds(updateDoc(custom, { active: false, updatedAt: Timestamp.now() }))
+    await assertFails(deleteDoc(custom))
   })
 })

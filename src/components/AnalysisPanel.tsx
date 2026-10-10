@@ -223,7 +223,8 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
   const weatherInsights = findWeatherInsights(displayedWeatherStats, weatherBaselineCounts, weatherBaselineTotal, moods)
   const primaryWeatherInsight: WeatherInsight | null = weatherInsights[0]?.lift >= ANALYSIS_THRESHOLDS.weatherInsightMinLift ? weatherInsights[0] : null
   const secondaryWeatherInsight = primaryWeatherInsight
-    ? weatherInsights.find((insight) => insight.group !== primaryWeatherInsight.group)
+    ? weatherInsights.find((insight) => insight.group !== primaryWeatherInsight.group
+      && insight.lift >= ANALYSIS_THRESHOLDS.weatherInsightMinLift)
     : null
   const displayedEntries = days === 30 && !showAllRecords ? visibleEntries.slice(0, ANALYSIS_THRESHOLDS.monthlyInitialRecords) : visibleEntries
   const usedReasonIds = [...new Set(validEntries.flatMap((entry) => entry.reason_ids ?? []))]
@@ -347,7 +348,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
             <div>
               <strong>최근 7일 중 {validStats.total}일을 기록했어요</strong>
-              <p>{streak === 7 ? '최근 7일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '오늘의 마음부터 천천히 남겨보세요.'}</p>
+              <p>{streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '오늘의 마음부터 천천히 남겨보세요.'}</p>
             </div>
           </section>
 
@@ -382,7 +383,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             <span className="analysis-star" aria-hidden="true"><StarIcon /></span>
             <div>
               <strong>최근 30일 중 {validStats.total}일을 기록했어요</strong>
-              <p>{streak >= 30 ? '최근 30일을 빠짐없이 기록했어요.' : streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '다시 기록을 시작해도 괜찮아요.'}</p>
+              <p>{streak >= 2 ? `지금 ${streak}일째 이어서 기록하고 있어요.` : streak === 1 ? '오늘의 마음을 기록했어요.' : '다시 기록을 시작해도 괜찮아요.'}</p>
             </div>
           </section>
 
@@ -475,8 +476,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             )}
           </section>
 
-          {reasonStats.length > 0 && (
-            <section className="analysis-reasons-card" aria-label="자주 고른 이유">
+          <section className="analysis-reasons-card" aria-label="자주 고른 이유">
               <div className="analysis-collapsible-heading">
                 <p>자주 고른 이유</p>
                 <button type="button" aria-expanded={!reasonsCollapsed} aria-controls="reason-analysis-details" onClick={() => setReasonsCollapsed((collapsed) => !collapsed)}>
@@ -521,8 +521,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                   </div>
                 </>
               )}
-            </section>
-          )}
+          </section>
         </>
       )}
 

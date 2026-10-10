@@ -34,7 +34,6 @@ beforeEach(() => {
     setReasonTagActive: vi.fn(),
     createReasonTag: vi.fn(),
     renameReasonTag: vi.fn(),
-    deleteReasonTag: vi.fn(),
   }
 })
 

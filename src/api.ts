@@ -14,7 +14,6 @@ import {
   runTransaction,
   serverTimestamp,
   startAt,
-  where,
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore'
@@ -350,26 +349,5 @@ export function createDiaryApi(uid: string) {
       })
     },
 
-    async deleteReasonTag(id: string) {
-      const tagRef = doc(reasonTagsRef(uid), id)
-      const tag = await getDoc(tagRef)
-      if (!tag.exists() || tag.data().builtIn === true) {
-        throw new Error('직접 추가한 이유만 삭제할 수 있습니다.')
-      }
-
-      const generation = await currentGeneration(uid)
-      const affected = await getDocs(query(entriesRef(uid, generation), where('reasonIds', 'array-contains', id)))
-      for (let index = 0; index < affected.docs.length; index += WRITE_BATCH_SIZE) {
-        const batch = writeBatch(requireDb())
-        for (const snapshot of affected.docs.slice(index, index + WRITE_BATCH_SIZE)) {
-          const reasonIds = Array.isArray(snapshot.data().reasonIds)
-            ? snapshot.data().reasonIds.filter((reasonId: unknown) => reasonId !== id)
-            : []
-          batch.update(snapshot.ref, { reasonIds, updatedAt: serverTimestamp() })
-        }
-        await batch.commit()
-      }
-      await deleteDoc(tagRef)
-    },
   }
 }
