@@ -1,5 +1,4 @@
 import type { Mood } from '../types'
-import { MOODS } from '../types'
 
 type MoodIconProps = {
   mood: Mood
@@ -19,22 +18,20 @@ const facePaths: Record<Mood, string> = {
 }
 
 export function MoodIcon({ mood, size = 28, className = '' }: MoodIconProps) {
-  const design = MOODS[mood]
-
   return (
     <svg
-      className={`mood-icon ${className}`.trim()}
+      className={`mood-icon mood-${mood} ${className}`.trim()}
       width={size}
       height={size}
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
     >
-      <circle cx="12" cy="12" r="11" fill={design.color} />
+      <circle cx="12" cy="12" r="11" fill="var(--mood-color)" />
       <path
         d={facePaths[mood]}
         fill="none"
-        stroke={design.text}
+        stroke="var(--mood-face)"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"

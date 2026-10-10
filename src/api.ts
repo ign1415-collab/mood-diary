@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { DEFAULT_REASON_TAGS, type AnalysisResult, type Backup, type Entry, type Mood, type ReasonTag, type Stats, type WeatherSnapshot } from './types'
+import { isThemePreference, type ThemePreference } from './theme'
 import { calculateStats, isValidDate, MAX_REASON_LABEL_LENGTH, monthAfter, sevenDayComparison, validateBackup, validateEntry } from './diaryLogic'
 
 const WRITE_BATCH_SIZE = 400
@@ -126,6 +127,27 @@ async function deleteGeneration(uid: string, generation: string) {
 
 export function createDiaryApi(uid: string) {
   return {
+    async getThemePreference(): Promise<ThemePreference> {
+      const snapshot = await getDoc(doc(requireDb(), 'users', uid))
+      const value = snapshot.data()?.themePreference
+      return isThemePreference(value) ? value : 'system'
+    },
+
+    async setThemePreference(themePreference: ThemePreference) {
+      if (!isThemePreference(themePreference)) throw new Error('테마 설정을 확인해 주세요.')
+      const firestore = requireDb()
+      const userRef = doc(firestore, 'users', uid)
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef)
+        transaction.set(userRef, {
+          currentGeneration: typeof snapshot.data()?.currentGeneration === 'string' ? snapshot.data()!.currentGeneration : 'main',
+          themePreference,
+          createdAt: snapshot.data()?.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      })
+    },
+
     async hasAnyEntries() {
       const generation = await currentGeneration(uid)
       const result = await getDocs(query(entriesRef(uid, generation), limit(1)))

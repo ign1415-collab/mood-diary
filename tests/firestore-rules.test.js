@@ -51,6 +51,23 @@ describe('Firestore 사용자별 보안 규칙', () => {
     await assertFails(setDoc(doc(bob, 'users/alice/diaries/main/entries/2026-10-01'), entry()))
   })
 
+  test('THEME 계정 테마 세 값만 저장하고 다른 사용자는 읽을 수 없다', async () => {
+    const alice = environment.authenticatedContext('alice').firestore()
+    const bob = environment.authenticatedContext('bob').firestore()
+    const userRef = doc(alice, 'users/alice')
+    const now = Timestamp.now()
+    await assertSucceeds(setDoc(userRef, {
+      currentGeneration: 'main',
+      themePreference: 'system',
+      createdAt: now,
+      updatedAt: now,
+    }))
+    await assertSucceeds(updateDoc(userRef, { themePreference: 'dark', updatedAt: Timestamp.now() }))
+    await assertSucceeds(updateDoc(userRef, { themePreference: 'light', updatedAt: Timestamp.now() }))
+    await assertFails(updateDoc(userRef, { themePreference: 'auto', updatedAt: Timestamp.now() }))
+    await assertFails(getDoc(doc(bob, 'users/alice')))
+  })
+
   test('H3 감정 8개는 허용하고 알 수 없는 감정과 긴 메모를 거부한다', async () => {
     const alice = environment.authenticatedContext('alice').firestore()
     const moods = ['happy', 'calm', 'excited', 'neutral', 'depressed', 'anxious', 'tired', 'angry']

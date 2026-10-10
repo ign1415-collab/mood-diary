@@ -64,6 +64,18 @@ service cloud.firestore {
       return tagId in ['person', 'sleep', 'health', 'study', 'work'];
     }
 
+    function validUserProfile() {
+      return request.resource.data.keys().hasOnly(['currentGeneration', 'themePreference', 'createdAt', 'updatedAt'])
+        && request.resource.data.currentGeneration is string
+        && request.resource.data.currentGeneration.size() <= 100
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.createdAt <= request.resource.data.updatedAt
+        && request.resource.data.updatedAt <= request.time
+        && (!request.resource.data.keys().hasAny(['themePreference'])
+          || request.resource.data.themePreference in ['system', 'light', 'dark']);
+    }
+
     function validReasonTagIdentity(tagId) {
       return (isDefaultReasonTag(tagId) && request.resource.data.builtIn == true)
         || (!isDefaultReasonTag(tagId) && request.resource.data.builtIn == false);
@@ -71,14 +83,9 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if signedInAs(userId);
-      allow create: if signedInAs(userId)
-        && request.resource.data.keys().hasOnly(['currentGeneration', 'createdAt', 'updatedAt'])
-        && request.resource.data.currentGeneration is string
-        && request.resource.data.currentGeneration.size() <= 100;
+      allow create: if signedInAs(userId) && validUserProfile();
       allow update: if signedInAs(userId)
-        && request.resource.data.keys().hasOnly(['currentGeneration', 'createdAt', 'updatedAt'])
-        && request.resource.data.currentGeneration is string
-        && request.resource.data.currentGeneration.size() <= 100
+        && validUserProfile()
         && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if false;
 

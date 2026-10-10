@@ -3,11 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#e11d48" />
     <meta name="description" content="하루의 감정을 조용히 기록하고 돌아보는 로컬 감정 일기" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>MOOD DIARY · 감정기록</title>
+    <script>
+      const themePreview = ['localhost', '127.0.0.1'].includes(location.hostname)
+        ? new URLSearchParams(location.search).get('theme-preview')
+        : null
+      document.documentElement.dataset.theme = themePreview === 'dark' || themePreview === 'light'
+        ? themePreview
+        : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    </script>
   </head>
   <body>
     <div id="root"></div>

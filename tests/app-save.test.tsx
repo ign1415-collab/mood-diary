@@ -34,7 +34,25 @@ beforeEach(() => {
     setReasonTagActive: vi.fn(),
     createReasonTag: vi.fn(),
     renameReasonTag: vi.fn(),
+    getThemePreference: vi.fn(async () => 'system'),
+    setThemePreference: vi.fn(async () => undefined),
   }
+})
+
+describe('계정 테마 선택', () => {
+  test('저장된 다크 테마를 불러오고 라이트 선택을 계정에 저장한다', async () => {
+    apiMock.getThemePreference.mockResolvedValue('dark')
+    const user = userEvent.setup()
+    render(<App userId="qa-user" userEmail="qa@example.com" onSignOut={vi.fn()} todayOverride="2026-10-09" />)
+
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'))
+    await user.click(screen.getByRole('button', { name: '화면 테마 선택' }))
+    expect(screen.getByRole('menuitemradio', { name: '항상 다크' })).toHaveAttribute('aria-checked', 'true')
+
+    await user.click(screen.getByRole('menuitemradio', { name: '항상 라이트' }))
+    await waitFor(() => expect(apiMock.setThemePreference).toHaveBeenCalledWith('light'))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  })
 })
 
 describe('느린 모바일 네트워크 저장', () => {

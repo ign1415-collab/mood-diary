@@ -5,8 +5,10 @@ import { Calendar } from './components/Calendar'
 import { EntryForm } from './components/EntryForm'
 import { WeatherBadge, type WeatherStatus } from './components/WeatherBadge'
 import { DiaryLogo } from './components/DiaryLogo'
+import { ThemePicker } from './components/ThemePicker'
 import { calculateStats, sevenDayComparison } from './diaryLogic'
 import { DEFAULT_REASON_TAGS, type AnalysisResult, type Entry, type Mood, type ReasonTag, type WeatherSnapshot } from './types'
+import { resolveTheme, restoreSystemTheme, watchTheme, type ResolvedTheme, type ThemePreference } from './theme'
 
 function localDate() {
   const now = new Date()
@@ -14,7 +16,9 @@ function localDate() {
 }
 
 const PREVIEW_MODE = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-const WEATHER_DEMO = PREVIEW_MODE && new URLSearchParams(window.location.search).has('weather-demo')
+const PREVIEW_PARAMS = new URLSearchParams(window.location.search)
+const WEATHER_DEMO = PREVIEW_MODE && PREVIEW_PARAMS.has('weather-demo')
+const EMPTY_DEMO = PREVIEW_MODE && PREVIEW_PARAMS.has('empty-preview')
 type PreviewChanges = Record<string, Entry | null>
 
 function previewStorageKey(userId: string) {
@@ -23,6 +27,10 @@ function previewStorageKey(userId: string) {
 
 function previewReasonTagsKey(userId: string) {
   return `mood-diary-preview-reason-tags:${userId}`
+}
+
+function previewThemeKey(userId: string) {
+  return `mood-diary-preview-theme:${userId}`
 }
 
 function defaultReasonTags(): ReasonTag[] {
@@ -125,10 +133,17 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
   const [weatherRequestKey, setWeatherRequestKey] = useState(0)
   const [activeTab, setActiveTab] = useState<'home' | 'analysis'>(WEATHER_DEMO ? 'analysis' : 'home')
   const [noteClearKey, setNoteClearKey] = useState(0)
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system')
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme('system', typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches))
+  const [themeSaving, setThemeSaving] = useState(false)
 
   const loadMonth = useCallback(async (targetMonth: string) => {
     setLoading(true)
     try {
+      if (EMPTY_DEMO) {
+        setEntries([])
+        return
+      }
       const cloudEntries = await api.list(targetMonth)
       const merged = PREVIEW_MODE
         ? mergePreviewEntries(userId, cloudEntries, (date) => date.startsWith(`${targetMonth}-`))
@@ -144,6 +159,18 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
   const loadAnalysis = useCallback(async (days: 7 | 30) => {
     setAnalysisLoading(true)
     try {
+      if (EMPTY_DEMO) {
+        const emptyEntries: Entry[] = []
+        setHasAnyHistory(false)
+        setAnalysis({
+          days,
+          ...calculateStats(emptyEntries),
+          entries: emptyEntries,
+          streak_entries: emptyEntries,
+          ...(days === 7 ? { comparison: sevenDayComparison(emptyEntries, today), comparison_pool: emptyEntries } : {}),
+        })
+        return
+      }
       const [cloudAnalysis, cloudHasAnyHistory] = await Promise.all([api.analysis(days), api.hasAnyEntries()])
       const previewHasEntry = PREVIEW_MODE && Object.values(readPreviewChanges(userId)).some((entry) => entry !== null)
       setHasAnyHistory(cloudHasAnyHistory || previewHasEntry)
@@ -185,6 +212,23 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
 
   useEffect(() => { void loadMonth(month) }, [month, loadMonth])
   useEffect(() => { void loadReasonTags() }, [loadReasonTags])
+  useEffect(() => watchTheme(themePreference, setResolvedTheme), [themePreference])
+  useEffect(() => () => restoreSystemTheme(), [])
+  useEffect(() => {
+    let active = true
+    const loadTheme = async () => {
+      try {
+        const saved = PREVIEW_MODE
+          ? window.localStorage.getItem(previewThemeKey(userId))
+          : await api.getThemePreference()
+        if (active && (saved === 'system' || saved === 'light' || saved === 'dark')) setThemePreferenceState(saved)
+      } catch {
+        // 테마 설정을 못 읽어도 기본값인 기기 설정으로 앱을 계속 연다.
+      }
+    }
+    void loadTheme()
+    return () => { active = false }
+  }, [api, userId])
   useEffect(() => {
     if (activeTab === 'analysis') void loadAnalysis(analysisDays)
   }, [activeTab, analysisDays, loadAnalysis])
@@ -260,6 +304,21 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
       if (PREVIEW_MODE) writePreviewReasonTags(userId, next)
       return next
     })
+  }
+
+  async function changeThemePreference(next: ThemePreference) {
+    const previous = themePreference
+    setThemePreferenceState(next)
+    setThemeSaving(true)
+    try {
+      if (PREVIEW_MODE) window.localStorage.setItem(previewThemeKey(userId), next)
+      else await api.setThemePreference(next)
+    } catch (error) {
+      setThemePreferenceState(previous)
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : '테마 설정을 저장하지 못했습니다.' })
+    } finally {
+      setThemeSaving(false)
+    }
   }
 
   async function save(value: { mood: Mood; note: string; reason_ids: string[]; weather?: WeatherSnapshot }) {
@@ -357,6 +416,7 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
         </div>
         <div className="header-info">
           <div className="header-actions">
+            <ThemePicker preference={themePreference} resolvedTheme={resolvedTheme} saving={themeSaving} onChange={(next) => void changeThemePreference(next)} />
             <button type="button" className="account-button" onClick={() => void onSignOut()} aria-label={`${userEmail} 계정에서 로그아웃`} title={`${userEmail} · 로그아웃`}>로그아웃</button>
           </div>
           <div className="header-context">

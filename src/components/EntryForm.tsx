@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Entry, Mood, ReasonTag, WeatherSnapshot } from '../types'
 import { isKnownMood, MAX_NOTE_LENGTH, MAX_REASON_IDS, MAX_REASON_LABEL_LENGTH } from '../diaryLogic'
 import { MOODS } from '../types'
@@ -198,7 +198,6 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
               <label
                 className={`mood-option mood-${key}`}
                 key={key}
-                style={{ '--mood-color': MOODS[key].color, '--mood-soft': MOODS[key].soft, '--mood-text': MOODS[key].selectedText } as CSSProperties}
               >
                 <input type="radio" name="mood" value={key} checked={mood === key} onChange={() => { setMood(key); setMoodError(false) }} />
                 <span className="mood-choice">

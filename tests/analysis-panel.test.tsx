@@ -488,17 +488,11 @@ describe('기존 데이터와 이유 통계', () => {
 
     const neutral = screen.getByRole('radio', { name: '보통' })
     expect(neutral).toBeChecked()
-    expect(neutral.closest('label')).toHaveStyle({
-      '--mood-soft': MOODS.neutral.soft,
-      '--mood-text': MOODS.neutral.selectedText,
-    })
+    expect(neutral.closest('label')).toHaveClass('mood-neutral')
 
     fireEvent.click(screen.getByRole('radio', { name: '불안' }))
     expect(screen.getByRole('radio', { name: '불안' })).toBeChecked()
-    expect(screen.getByRole('radio', { name: '불안' }).closest('label')).toHaveStyle({
-      '--mood-soft': MOODS.anxious.soft,
-      '--mood-text': MOODS.anxious.selectedText,
-    })
+    expect(screen.getByRole('radio', { name: '불안' }).closest('label')).toHaveClass('mood-anxious')
   })
 
   test('H1·H2 기존 neutral/depressed는 보통/우울로 표시한다', () => {

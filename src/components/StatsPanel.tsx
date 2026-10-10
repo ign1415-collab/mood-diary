@@ -37,9 +37,9 @@ export function StatsPanel({ stats, loading }: Props) {
               const value = stats.moods[mood]
               return (
                 <div className="bar-row" key={mood}>
-                  <div className="bar-label"><span className="legend-dot" style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</div>
+                  <div className="bar-label"><span className={`legend-dot mood-${mood}`} />{MOODS[mood].label}</div>
                   <div className="bar-track" aria-label={`${MOODS[mood].label} ${value.count}일, ${value.percentage}%`}>
-                    <span style={{ width: `${value.percentage}%`, background: MOODS[mood].color }} />
+                    <span className={`mood-${mood}`} style={{ width: `${value.percentage}%` }} />
                   </div>
                   <strong>{value.count}<small>일</small></strong>
                 </div>

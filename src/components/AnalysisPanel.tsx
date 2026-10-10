@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { AnalysisResult, Entry, Mood, ReasonTag } from '../types'
 import { calculateStats, isKnownMood, MAX_NOTE_LENGTH } from '../diaryLogic'
 import { ANALYSIS_THRESHOLDS } from '../analysisConstants'
@@ -359,12 +359,13 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             <div className="week-strip">
               {weekDates.map((date) => {
                 const entry = entriesByDate.get(date)
-                const mood = entry && isKnownMood(entry.mood) ? MOODS[entry.mood] : null
+                const knownMood = entry && isKnownMood(entry.mood) ? entry.mood : null
+                const mood = knownMood ? MOODS[knownMood] : null
                 const value = new Date(`${date}T00:00:00Z`)
                 return (
-                  <div className={`week-day ${entry ? 'recorded' : ''} ${entry && !mood ? 'unknown' : ''} ${date === today ? 'today' : ''}`} key={date}>
+                  <div className={`week-day ${entry ? 'recorded' : ''} ${entry && !knownMood ? 'unknown' : ''} ${date === today ? 'today' : ''}`} key={date}>
                     <span>{weekdayLabels[value.getUTCDay()]}</span>
-                    <strong style={mood ? { background: mood.color, color: mood.text } : undefined}>{value.getUTCDate()}</strong>
+                    <strong className={knownMood ? `mood-${knownMood}` : undefined}>{value.getUTCDate()}</strong>
                     <small>{entry && !mood ? '알 수 없음' : mood?.label ?? ''}</small>
                   </div>
                 )
@@ -392,7 +393,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             <h2>{monthlySummary}</h2>
             <div className="mood-ratio-bar" aria-label="감정별 기록 비율">
               {sortedMoodStats.map((mood) => (
-                <span key={mood} style={{ flex: validStats.moods[mood].count, background: MOODS[mood].color }} title={`${MOODS[mood].label} ${validStats.moods[mood].count}회`} />
+                <span className={`mood-${mood}`} key={mood} style={{ flex: validStats.moods[mood].count }} title={`${MOODS[mood].label} ${validStats.moods[mood].count}회`} />
               ))}
             </div>
             <div className="mood-ratio-legend">
@@ -403,7 +404,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                   className={selectedMood === mood ? 'active' : ''}
                   onClick={() => { setSelectedMood(selectedMood === mood ? null : mood); setSelectedReasonId(null); setShowAllRecords(false) }}
                 >
-                  <span><i style={{ background: MOODS[mood].color }} />{MOODS[mood].label}</span>
+                  <span><i className={`mood-${mood}`} />{MOODS[mood].label}</span>
                   <strong>{validStats.moods[mood].count}회</strong>
                 </button>
               ))}
@@ -429,7 +430,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                         <span><WeatherIcon description={description} size={15} />{group} {count}일</span>
                         <div className="weather-ratio-bar">
                           {moods.filter((mood) => counts[mood] > 0).map((mood) => (
-                            <i key={mood} style={{ flex: counts[mood], background: MOODS[mood].color }} />
+                            <i className={`mood-${mood}`} key={mood} style={{ flex: counts[mood] }} />
                           ))}
                         </div>
                         <strong>{leadingMood ? MOODS[leadingMood].label : ''}</strong>
@@ -439,12 +440,12 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                   {primaryWeatherInsight && (
                     <div className="weather-insight-evidence">
                       <p>
-                        <i style={{ background: MOODS[primaryWeatherInsight.mood].color }} />
+                        <i className={`mood-${primaryWeatherInsight.mood}`} />
                         <span>{weatherEvidenceLabel(primaryWeatherInsight.group)} {primaryWeatherInsight.count}일 중 {primaryWeatherInsight.moodCount}일이 {moodPastTense[primaryWeatherInsight.mood]}. 전체 기록에서는 {weatherBaselineTotal}일 중 {weatherBaselineCounts[primaryWeatherInsight.mood]}일이 {moodPastTense[primaryWeatherInsight.mood]}.</span>
                       </p>
                       {secondaryWeatherInsight && (
                         <p>
-                          <i style={{ background: MOODS[secondaryWeatherInsight.mood].color }} />
+                          <i className={`mood-${secondaryWeatherInsight.mood}`} />
                           <span>{weatherEvidenceLabel(secondaryWeatherInsight.group)} {secondaryWeatherInsight.count}일 중 {secondaryWeatherInsight.moodCount}일은 {moodPastTense[secondaryWeatherInsight.mood]}.</span>
                         </p>
                       )}
@@ -587,7 +588,6 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                         <label
                           key={mood}
                           className={`mood-${mood}`}
-                          style={{ '--mood-color': MOODS[mood].color, '--mood-soft': MOODS[mood].soft, '--mood-text': MOODS[mood].selectedText } as CSSProperties}
                         >
                           <input type="radio" name={`edit-mood-${entry.date}`} checked={editMood === mood} onChange={() => setEditMood(mood)} />
                           <span><MoodIcon mood={mood} size={20} />{MOODS[mood].label}</span>
