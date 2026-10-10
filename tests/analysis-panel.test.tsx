@@ -481,6 +481,26 @@ describe('날씨 저장값 분류와 날씨별 분석', () => {
 })
 
 describe('기존 데이터와 이유 통계', () => {
+  test('분석 기록 수정에서도 선택 감정의 고유 색 변수를 사용한다', () => {
+    renderPanel(result(30, [entry(TODAY, 'neutral')]))
+    fireEvent.click(screen.getByRole('button', { name: `${TODAY} 기록 메뉴` }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '수정' }))
+
+    const neutral = screen.getByRole('radio', { name: '보통' })
+    expect(neutral).toBeChecked()
+    expect(neutral.closest('label')).toHaveStyle({
+      '--mood-soft': MOODS.neutral.soft,
+      '--mood-text': MOODS.neutral.selectedText,
+    })
+
+    fireEvent.click(screen.getByRole('radio', { name: '불안' }))
+    expect(screen.getByRole('radio', { name: '불안' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '불안' }).closest('label')).toHaveStyle({
+      '--mood-soft': MOODS.anxious.soft,
+      '--mood-text': MOODS.anxious.selectedText,
+    })
+  })
+
   test('H1·H2 기존 neutral/depressed는 보통/우울로 표시한다', () => {
     renderPanel(result(30, makeEntries(TODAY, ['neutral', 'depressed'])))
     expect(screen.getAllByText('보통').length).toBeGreaterThan(0)

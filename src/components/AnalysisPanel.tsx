@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import type { AnalysisResult, Entry, Mood, ReasonTag } from '../types'
 import { calculateStats, isKnownMood, MAX_NOTE_LENGTH } from '../diaryLogic'
 import { ANALYSIS_THRESHOLDS } from '../analysisConstants'
@@ -584,7 +584,11 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                     <legend>기분 수정</legend>
                     <div className="analysis-edit-moods">
                       {(Object.keys(MOODS) as Mood[]).map((mood) => (
-                        <label key={mood}>
+                        <label
+                          key={mood}
+                          className={`mood-${mood}`}
+                          style={{ '--mood-color': MOODS[mood].color, '--mood-soft': MOODS[mood].soft, '--mood-text': MOODS[mood].selectedText } as CSSProperties}
+                        >
                           <input type="radio" name={`edit-mood-${entry.date}`} checked={editMood === mood} onChange={() => setEditMood(mood)} />
                           <span><MoodIcon mood={mood} size={20} />{MOODS[mood].label}</span>
                         </label>

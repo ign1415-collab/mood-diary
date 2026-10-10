@@ -163,7 +163,7 @@ main { flex: 1; padding: 8px 30px 22px; }
 .month-nav { display: flex; gap: 10px; }
 .icon-button {
   width: 40px; height: 40px; display: grid; place-items: center;
-  border: 0; border-radius: 50%; background: var(--card); cursor: pointer;
+  border: 0; border-radius: 50%; color: var(--ink); background: var(--card); cursor: pointer;
 }
 .icon-button::before {
   content: ''; width: 8px; height: 8px; display: block;
@@ -172,6 +172,7 @@ main { flex: 1; padding: 8px 30px 22px; }
 .icon-button.previous::before { transform: translateX(2px) rotate(45deg); }
 .icon-button.next::before { transform: translateX(-2px) rotate(225deg); }
 .icon-button:hover:not(:disabled) { color: var(--ink); background: #e8e6ee; border-color: #e8e6ee; }
+.icon-button:active:not(:disabled) { color: var(--ink); background: #e8e6ee; }
 .icon-button:disabled { opacity: .28; cursor: default; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
 .weekdays { margin-bottom: 7px; }
@@ -452,8 +453,10 @@ textarea::placeholder { color: #777b76; }
 .analysis-edit-moods label > span {
   min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 5px;
   border: 1px solid #c9c7c0; border-radius: 9px; background: white; font-size: 12px; font-weight: 800;
+  transition: background .15s, border-color .15s, color .15s;
 }
-.analysis-edit-moods input:checked + span { color: var(--teal); border-color: var(--teal); background: var(--teal-soft); }
+.analysis-edit-moods label:hover > span { border-color: var(--mood-color); }
+.analysis-edit-moods input:checked + span { color: var(--mood-text); border-color: var(--mood-text); background: var(--mood-soft); }
 .analysis-edit-moods i { font-style: normal; }
 .analysis-edit-reasons { margin-top: 14px; }
 .analysis-edit-reasons legend { display: flex; align-items: baseline; gap: 6px; }
