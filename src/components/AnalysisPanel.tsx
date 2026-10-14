@@ -534,7 +534,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
               ? `${MOODS[selectedMood].label} 기록 ${visibleEntries.length}개`
               : selectedReasonId
                 ? `${reasonTags.find((tag) => tag.id === selectedReasonId)?.label ?? '이유'} 기록 ${visibleEntries.length}개`
-                : `기록 ${visibleEntries.length}개`}</h2>
+                : `마음 기록 ${visibleEntries.length}개`}</h2>
           {days === 30 && (selectedMood || selectedReasonId) && (
             <button type="button" onClick={() => { setSelectedMood(null); setSelectedReasonId(null); setShowAllRecords(false) }}>전체 보기</button>
           )}

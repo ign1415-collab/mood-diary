@@ -312,7 +312,7 @@ describe('최근 30일 요약과 필터', () => {
     renderPanel(monthlyFixture())
     expect(screen.getByText('최근 30일 중 5일을 기록했어요')).toBeInTheDocument()
     expect(screen.getByText('30일 동안 5번 기록했어요')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '기록 5개' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '마음 기록 5개' })).toBeInTheDocument()
   })
 
   test('M5 기록 8개면 최신 3개와 더 보기 5개를 표시한다', () => {
@@ -334,7 +334,7 @@ describe('최근 30일 요약과 필터', () => {
     expect(screen.getByRole('heading', { name: '행복 기록 2개' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '전체 보기' })).toBeInTheDocument()
     await userEvent.click(button)
-    expect(screen.getByRole('heading', { name: '기록 5개' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '마음 기록 5개' })).toBeInTheDocument()
   })
 
   test('M10 필터를 바꾸면 펼친 목록이 다시 접힌다', async () => {
