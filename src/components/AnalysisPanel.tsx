@@ -551,33 +551,35 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
             const knownMood = isKnownMood(entry.mood) ? entry.mood : null
             return (
             <article key={entry.date}>
-              <div className={`record-mood ${knownMood ? '' : 'unknown'}`}>
-                {knownMood
-                  ? <MoodIcon mood={knownMood} size={24} />
-                  : <span className="unknown-mood-icon" aria-hidden="true" />}
-                <strong>{knownMood ? MOODS[knownMood].label : '알 수 없는 감정'}</strong>
+              <div className="record-header">
+                <div className={`record-mood ${knownMood ? '' : 'unknown'}`}>
+                  {knownMood
+                    ? <MoodIcon mood={knownMood} size={24} />
+                    : <span className="unknown-mood-icon" aria-hidden="true" />}
+                  <strong>{knownMood ? MOODS[knownMood].label : '알 수 없는 감정'}</strong>
+                </div>
+                <div className="record-actions">
+                  {entry.weather && (
+                    <span className="record-weather" title={entry.weather.location ? `${entry.weather.location} · ${entry.weather.description}` : entry.weather.description}>
+                      <WeatherIcon description={entry.weather.description} size={14} />
+                      {entry.weather.temperature !== undefined ? `${entry.weather.temperature}°` : ''}
+                    </span>
+                  )}
+                  <time dateTime={entry.date}>{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${entry.date}T00:00:00Z`))}</time>
+                  <button type="button" className="more-button" aria-label={`${entry.date} 기록 메뉴`} aria-expanded={openMenu === entry.date} onClick={() => setOpenMenu(openMenu === entry.date ? null : entry.date)}>⋯</button>
+                  {openMenu === entry.date && (
+                    <div className="record-menu" role="menu">
+                      <button type="button" className="edit-record" role="menuitem" onClick={() => startEditing(entry)}>수정</button>
+                      <button type="button" className="delete-record" role="menuitem" onClick={async () => { setOpenMenu(null); await onDelete(entry.date) }}>삭제</button>
+                    </div>
+                  )}
+                </div>
               </div>
               {!!entry.reason_ids?.length && (
                 <span className="record-reasons">
                   {entry.reason_ids.map((id) => <small key={id}>{reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유'}</small>)}
                 </span>
               )}
-              <div className="record-actions">
-                {entry.weather && (
-                  <span className="record-weather" title={entry.weather.location ? `${entry.weather.location} · ${entry.weather.description}` : entry.weather.description}>
-                    <WeatherIcon description={entry.weather.description} size={14} />
-                    {entry.weather.temperature !== undefined ? `${entry.weather.temperature}°` : ''}
-                  </span>
-                )}
-                <time dateTime={entry.date}>{new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(`${entry.date}T00:00:00Z`))}</time>
-                <button type="button" className="more-button" aria-label={`${entry.date} 기록 메뉴`} aria-expanded={openMenu === entry.date} onClick={() => setOpenMenu(openMenu === entry.date ? null : entry.date)}>⋯</button>
-                {openMenu === entry.date && (
-                  <div className="record-menu" role="menu">
-                    <button type="button" className="edit-record" role="menuitem" onClick={() => startEditing(entry)}>수정</button>
-                    <button type="button" className="delete-record" role="menuitem" onClick={async () => { setOpenMenu(null); await onDelete(entry.date) }}>삭제</button>
-                  </div>
-                )}
-              </div>
               {entry.note && <p>{entry.note}</p>}
               {editingDate === entry.date && (
                 <form className="analysis-inline-editor" onSubmit={(event) => void submitEdit(event)}>

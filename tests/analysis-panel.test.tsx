@@ -326,6 +326,17 @@ describe('최근 30일 요약과 필터', () => {
     expect(screen.queryByRole('button', { name: /더 보기/ })).not.toBeInTheDocument()
   })
 
+  test('기록 카드 상단은 감정과 날짜·메뉴를 한 묶음으로 유지한다', () => {
+    renderPanel(result(30, [entry(TODAY, 'neutral', { reason_ids: ['sleep'], note: '마음 기록' })]))
+    const article = screen.getByRole('article')
+    const header = article.querySelector('.record-header') as HTMLElement
+    const reasons = article.querySelector('.record-reasons') as HTMLElement
+    expect(header).toContainElement(article.querySelector('.record-mood'))
+    expect(header).toContainElement(article.querySelector('.record-actions'))
+    expect(header).not.toContainElement(reasons)
+    expect(article).toContainElement(reasons)
+  })
+
   test('M7·M8 감정 범례를 누르면 걸러지고 다시 누르면 풀린다', async () => {
     vi.useRealTimers()
     renderPanel(monthlyFixture())
