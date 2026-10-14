@@ -556,12 +556,12 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                   ? <MoodIcon mood={knownMood} size={24} />
                   : <span className="unknown-mood-icon" aria-hidden="true" />}
                 <strong>{knownMood ? MOODS[knownMood].label : '알 수 없는 감정'}</strong>
-                {!!entry.reason_ids?.length && (
-                  <span className="record-reasons">
-                    {entry.reason_ids.map((id) => <small key={id}>{reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유'}</small>)}
-                  </span>
-                )}
               </div>
+              {!!entry.reason_ids?.length && (
+                <span className="record-reasons">
+                  {entry.reason_ids.map((id) => <small key={id}>{reasonTags.find((tag) => tag.id === id)?.label ?? '알 수 없는 이유'}</small>)}
+                </span>
+              )}
               <div className="record-actions">
                 {entry.weather && (
                   <span className="record-weather" title={entry.weather.location ? `${entry.weather.location} · ${entry.weather.description}` : entry.weather.description}>

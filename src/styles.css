@@ -532,15 +532,15 @@ textarea::placeholder { color: var(--placeholder); }
 }
 .analysis-records-heading button:hover { border-color: var(--ink); background: var(--surface); }
 .analysis-records > p { margin: 27px 0; text-align: center; color: var(--muted); font-size: 14px; }
-.analysis-records article { position: relative; padding: 14px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; border-bottom: 1px solid var(--line); }
+.analysis-records article { position: relative; padding: 14px 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 5px 12px; border-bottom: 1px solid var(--line); }
 .analysis-records article:last-child { border-bottom: 0; }
-.record-mood { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.record-mood { min-width: 0; grid-column: 1; display: flex; gap: 6px 8px; align-items: center; }
 .record-mood > strong { white-space: nowrap; }
 .record-mood.unknown { color: var(--unknown-text); }
 .unknown-mood-icon { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; background: var(--unknown-bg); }
-.record-reasons { display: flex; flex-wrap: wrap; gap: 4px; }
+.record-reasons { min-width: 0; grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px; }
 .record-reasons small { padding: 3px 7px; border-radius: 9px; color: var(--muted); background: var(--card); font-size: 10px; font-weight: 600; white-space: nowrap; }
-.record-actions { min-width: 0; position: relative; display: flex; gap: 8px; align-items: center; }
+.record-actions { min-width: 0; grid-column: 3; position: relative; display: flex; gap: 8px; align-items: center; }
 .record-weather { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .analysis-records time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .analysis-records article p { grid-column: 1 / -1; margin: 3px 0 0; color: var(--muted); font-size: 13px; }
@@ -699,10 +699,12 @@ textarea::placeholder { color: var(--placeholder); }
 }
 
 @media (max-width: 430px) {
-  .analysis-records article { grid-template-columns: minmax(0, 1fr); }
+  .analysis-records article { grid-template-columns: minmax(0, 1fr) auto; }
+  .record-mood { grid-column: 1; grid-row: 1; }
   .record-actions {
-    grid-column: 1; justify-self: end; flex-wrap: wrap; justify-content: flex-end;
+    grid-column: 2; grid-row: 1; justify-self: end; gap: 5px;
   }
+  .record-reasons { grid-column: 1 / -1; grid-row: 2; }
   .analysis-edit-moods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .reason-analysis-list button { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; }
   .reason-analysis-list span { grid-column: 1 / -1; white-space: nowrap; }
