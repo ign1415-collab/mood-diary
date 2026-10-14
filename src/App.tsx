@@ -96,7 +96,7 @@ function startDateForPeriod(today: string, days: 7 | 30) {
   return start.toISOString().slice(0, 10)
 }
 
-type Notice = { kind: 'success' | 'error'; text: string } | null
+type Notice = { kind: 'error'; text: string } | null
 
 type AppProps = {
   userId: string
@@ -132,7 +132,6 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
   const [weatherStatus, setWeatherStatus] = useState<WeatherStatus>('loading')
   const [weatherRequestKey, setWeatherRequestKey] = useState(0)
   const [activeTab, setActiveTab] = useState<'home' | 'analysis'>(WEATHER_DEMO ? 'analysis' : 'home')
-  const [noteClearKey, setNoteClearKey] = useState(0)
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system')
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme('system', typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches))
   const [themeSaving, setThemeSaving] = useState(false)
@@ -347,13 +346,6 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
         ...current.filter((entry) => entry.date !== savedEntry.date),
         savedEntry,
       ].sort((a, b) => a.date.localeCompare(b.date)))
-      setNoteClearKey((key) => key + 1)
-      setNotice({
-        kind: 'success',
-        text: PREVIEW_MODE
-          ? '로컬 미리보기에 저장했습니다.'
-          : selectedEntry ? '수정한 마음을 저장했습니다.' : '오늘의 마음을 저장했습니다.',
-      })
       return true
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : '저장하지 못했습니다.' })
@@ -370,7 +362,6 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
       if (PREVIEW_MODE) writePreviewChange(userId, date, null)
       else await api.remove(date)
       await Promise.all([loadMonth(month), loadAnalysis(analysisDays)])
-      setNotice({ kind: 'success', text: PREVIEW_MODE ? '로컬 미리보기에서 삭제했습니다.' : '기록을 삭제했습니다.' })
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : '삭제하지 못했습니다.' })
     } finally {
@@ -397,7 +388,6 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
         await api.save(date, value)
       }
       await Promise.all([loadAnalysis(analysisDays), loadMonth(month)])
-      setNotice({ kind: 'success', text: PREVIEW_MODE ? '로컬 미리보기를 수정했습니다.' : '수정한 마음을 저장했습니다.' })
       return true
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : '수정하지 못했습니다.' })
@@ -408,7 +398,7 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${notice ? ' has-notice' : ''}`}>
       <header className="app-header">
         <div className="brand">
           <DiaryLogo className="brand-logo" />
@@ -431,7 +421,7 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
           <div className="home-page">
             <div className="home-stack">
               <Calendar month={month} entries={entries} selectedDate={selectedDate} today={today} onMonthChange={setMonth} onSelect={selectDate} />
-              <EntryForm date={selectedDate} today={today} entry={selectedEntry} weather={weather} reasonTags={reasonTags} saving={saving} noteClearKey={noteClearKey} onCreateReasonTag={createReasonTag} onSetReasonTagActive={setReasonTagActive} onRenameReasonTag={renameReasonTag} onSave={save} />
+              <EntryForm date={selectedDate} today={today} entry={selectedEntry} weather={weather} reasonTags={reasonTags} saving={saving} onCreateReasonTag={createReasonTag} onSetReasonTagActive={setReasonTagActive} onRenameReasonTag={renameReasonTag} onSave={save} />
             </div>
           </div>
         ) : (
@@ -441,12 +431,14 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
         )}
       </main>
 
-      {notice && <div className={`toast ${notice.kind}`} role="status">{notice.text}</div>}
       <div className="bottom-nav-backdrop" aria-hidden="true" />
-      <nav className="bottom-nav" aria-label="주요 메뉴">
-        <button type="button" className={activeTab === 'home' ? 'active' : ''} onClick={() => setActiveTab('home')} aria-current={activeTab === 'home' ? 'page' : undefined}><NavIcon name="home" /><span>홈</span></button>
-        <button type="button" className={activeTab === 'analysis' ? 'active' : ''} onClick={() => setActiveTab('analysis')} aria-current={activeTab === 'analysis' ? 'page' : undefined}><NavIcon name="analysis" /><span>분석</span></button>
-      </nav>
+      <div className="bottom-stack">
+        {notice && <div className={`toast ${notice.kind}`} role="status">{notice.text}</div>}
+        <nav className="bottom-nav" aria-label="주요 메뉴">
+          <button type="button" className={activeTab === 'home' ? 'active' : ''} onClick={() => setActiveTab('home')} aria-current={activeTab === 'home' ? 'page' : undefined}><NavIcon name="home" /><span>홈</span></button>
+          <button type="button" className={activeTab === 'analysis' ? 'active' : ''} onClick={() => setActiveTab('analysis')} aria-current={activeTab === 'analysis' ? 'page' : undefined}><NavIcon name="analysis" /><span>분석</span></button>
+        </nav>
+      </div>
     </div>
   )
 }

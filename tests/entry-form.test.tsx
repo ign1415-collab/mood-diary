@@ -34,7 +34,6 @@ function renderForm(options: { date?: string; entry?: Entry; weather?: WeatherSn
       entry={options.entry}
       weather={options.weather === undefined ? weather : options.weather}
       saving={false}
-      noteClearKey={0}
       reasonTags={tags}
       {...callbacks}
     />,

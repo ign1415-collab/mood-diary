@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { Entry, Mood, ReasonTag, WeatherSnapshot } from '../types'
 import { isKnownMood, MAX_NOTE_LENGTH, MAX_REASON_IDS, MAX_REASON_LABEL_LENGTH } from '../diaryLogic'
 import { MOODS } from '../types'
@@ -10,7 +10,6 @@ interface Props {
   entry?: Entry
   weather?: WeatherSnapshot | null
   saving: boolean
-  noteClearKey: number
   reasonTags: ReasonTag[]
   onSave: (value: { mood: Mood; note: string; reason_ids: string[]; weather?: WeatherSnapshot }) => Promise<boolean>
   onCreateReasonTag: (label: string) => Promise<ReasonTag>
@@ -18,7 +17,7 @@ interface Props {
   onRenameReasonTag: (id: string, label: string) => Promise<void>
 }
 
-export function EntryForm({ date, today, entry, weather, saving, noteClearKey, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive, onRenameReasonTag }: Props) {
+export function EntryForm({ date, today, entry, weather, saving, reasonTags, onSave, onCreateReasonTag, onSetReasonTagActive, onRenameReasonTag }: Props) {
   const [mood, setMood] = useState<Mood | null>(null)
   const [note, setNote] = useState('')
   const [selectedReasonIds, setSelectedReasonIds] = useState<string[]>([])
@@ -31,7 +30,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   const [reasonError, setReasonError] = useState('')
   const [tagSaving, setTagSaving] = useState(false)
   const [moodError, setMoodError] = useState(false)
-  const lastNoteClearKey = useRef(noteClearKey)
+  const [saveComplete, setSaveComplete] = useState(false)
 
   useEffect(() => {
     setMood(entry && isKnownMood(entry.mood) ? entry.mood : null)
@@ -48,11 +47,10 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   }, [date, entry])
 
   useEffect(() => {
-    if (noteClearKey !== lastNoteClearKey.current) {
-      lastNoteClearKey.current = noteClearKey
-      setNote('')
-    }
-  }, [noteClearKey])
+    if (!saveComplete) return
+    const timer = window.setTimeout(() => setSaveComplete(false), 1500)
+    return () => window.clearTimeout(timer)
+  }, [saveComplete])
 
   const formattedDate = new Intl.DateTimeFormat('ko-KR', {
     month: 'long', day: 'numeric', weekday: 'long', timeZone: 'UTC',
@@ -61,6 +59,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
   const availableReasonTags = reasonTags.filter((tag) => tag.active || selectedReasonIds.includes(tag.id))
 
   function toggleReason(id: string) {
+    setSaveComplete(false)
     setReasonError('')
     setSelectedReasonIds((current) => {
       if (current.includes(id)) return current.filter((reasonId) => reasonId !== id)
@@ -178,7 +177,8 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
       reason_ids: selectedReasonIds,
       ...(date === today && weather ? { weather } : {}),
     })
-    if (saved) setNote('')
+    if (!saved) return
+    setSaveComplete(true)
   }
 
   return (
@@ -199,7 +199,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
                 className={`mood-option mood-${key}`}
                 key={key}
               >
-                <input type="radio" name="mood" value={key} checked={mood === key} onChange={() => { setMood(key); setMoodError(false) }} />
+                <input type="radio" name="mood" value={key} checked={mood === key} onChange={() => { setMood(key); setMoodError(false); setSaveComplete(false) }} />
                 <span className="mood-choice">
                   <MoodIcon mood={key} size={28} />
                   <strong>{MOODS[key].label}</strong>
@@ -220,7 +220,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
           maxLength={MAX_NOTE_LENGTH}
           rows={3}
           spellCheck={false}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => { setNote(event.target.value); setSaveComplete(false) }}
           placeholder="어떤 하루였는지 들려주세요."
         />
 
@@ -323,7 +323,7 @@ export function EntryForm({ date, today, entry, weather, saving, noteClearKey, r
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={saving}>{saving ? '저장 중…' : entry ? '수정 내용 저장' : '저장하기'}</button>
+          <button type="submit" className="primary-button" disabled={saving}>{saving ? '저장 중…' : saveComplete ? '✓ 저장했어요' : entry ? '수정 내용 저장' : '저장하기'}</button>
         </div>
       </form>
     </section>
