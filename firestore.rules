@@ -14,7 +14,7 @@ service cloud.firestore {
         && request.resource.data.note.size() <= 300
         && (!request.resource.data.keys().hasAny(['reasonIds']) || (
           request.resource.data.reasonIds is list
-          && request.resource.data.reasonIds.size() <= 8
+          && request.resource.data.reasonIds.size() <= 10
         ))
         && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt is timestamp
@@ -51,7 +51,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['label', 'active', 'builtIn', 'createdAt', 'updatedAt'])
         && request.resource.data.label is string
         && request.resource.data.label.size() > 0
-        && request.resource.data.label.size() <= 8
+        && request.resource.data.label.size() <= 10
         && request.resource.data.active is bool
         && request.resource.data.builtIn is bool
         && request.resource.data.createdAt is timestamp

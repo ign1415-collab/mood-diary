@@ -20,7 +20,8 @@ describe('감정 기록 검증', () => {
     assert.match(validateEntry({ mood: 'confused', note: '' }) ?? '', /감정/)
     assert.match(validateEntry({ mood: 'happy', note: '가'.repeat(301) }) ?? '', /300자/)
     assert.match(validateEntry({ mood: 'happy', note: '', reason_ids: ['sleep', 'sleep'] }) ?? '', /이유 태그/)
-    assert.match(validateEntry({ mood: 'happy', note: '', reason_ids: Array.from({ length: 9 }, (_, index) => `tag-${index}`) }) ?? '', /이유 태그/)
+    assert.equal(validateEntry({ mood: 'happy', note: '', reason_ids: Array.from({ length: 10 }, (_, index) => `tag-${index}`) }), null)
+    assert.match(validateEntry({ mood: 'happy', note: '', reason_ids: Array.from({ length: 11 }, (_, index) => `tag-${index}`) }) ?? '', /이유 태그/)
     assert.equal(validateEntry({
       mood: 'happy',
       note: '',

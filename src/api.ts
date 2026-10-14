@@ -318,7 +318,7 @@ export function createDiaryApi(uid: string) {
 
     async createReasonTag(label: string) {
       const normalized = label.trim()
-      if (!normalized || normalized.length > MAX_REASON_LABEL_LENGTH) {
+      if (!normalized || [...normalized].length > MAX_REASON_LABEL_LENGTH) {
         throw new Error(`이유 이름은 ${MAX_REASON_LABEL_LENGTH}자까지 입력할 수 있습니다.`)
       }
       const id = `custom-${crypto.randomUUID()}`

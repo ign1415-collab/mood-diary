@@ -129,16 +129,16 @@ describe('이유 태그 입력과 관리', () => {
     expect(onCreateReasonTag).not.toHaveBeenCalled()
   })
 
-  test('R4 9글자를 입력해도 8글자까지만 전달한다', async () => {
+  test('R4 11글자를 입력해도 10글자까지만 전달한다', async () => {
     const user = userEvent.setup()
     const { onCreateReasonTag } = renderForm()
     await user.click(screen.getByRole('button', { name: /이유 추가/ }))
     await user.click(screen.getByRole('button', { name: '+ 직접 추가' }))
     const input = screen.getByLabelText('직접 추가할 이유')
-    await user.type(input, '가나다라마바사아자')
-    expect(input).toHaveValue('가나다라마바사아')
+    await user.type(input, '가나다라마바사아자차카')
+    expect(input).toHaveValue('가나다라마바사아자차')
     await user.click(within(input.parentElement!).getByRole('button', { name: '추가' }))
-    expect(onCreateReasonTag).toHaveBeenCalledWith('가나다라마바사아')
+    expect(onCreateReasonTag).toHaveBeenCalledWith('가나다라마바사아자차')
   })
 
   test('R5 비활성 태그는 새 기록 선택지에서 숨고 예전 기록에서는 보인다', async () => {

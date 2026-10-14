@@ -234,7 +234,7 @@ export default function App({ userId, userEmail, onSignOut, todayOverride }: App
   }, [activeTab, analysisDays, loadAnalysis])
   useEffect(() => {
     if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), notice.kind === 'success' ? 1500 : 4000)
+    const timer = window.setTimeout(() => setNotice(null), 1500)
     return () => window.clearTimeout(timer)
   }, [notice])
 

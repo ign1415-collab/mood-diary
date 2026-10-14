@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { AnalysisResult, Entry, Mood, ReasonTag } from '../types'
-import { calculateStats, isKnownMood, MAX_NOTE_LENGTH } from '../diaryLogic'
+import { calculateStats, isKnownMood, MAX_NOTE_LENGTH, MAX_REASON_IDS } from '../diaryLogic'
 import { ANALYSIS_THRESHOLDS } from '../analysisConstants'
 import { MOODS } from '../types'
 import { MoodIcon } from './MoodIcon'
@@ -604,7 +604,7 @@ export function AnalysisPanel({ days, analysis, hasAnyHistory, loading, saving, 
                           key={tag.id}
                           className={editReasonIds.includes(tag.id) ? 'selected' : ''}
                           aria-pressed={editReasonIds.includes(tag.id)}
-                          onClick={() => setEditReasonIds((current) => current.includes(tag.id) ? current.filter((id) => id !== tag.id) : current.length < 8 ? [...current, tag.id] : current)}
+                          onClick={() => setEditReasonIds((current) => current.includes(tag.id) ? current.filter((id) => id !== tag.id) : current.length < MAX_REASON_IDS ? [...current, tag.id] : current)}
                         >
                           {tag.label}
                         </button>

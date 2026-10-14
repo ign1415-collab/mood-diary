@@ -2,8 +2,8 @@ import type { Backup, Entry, Mood, ReasonTag, Stats, WeatherSnapshot } from './t
 
 export const MOOD_VALUES: Mood[] = ['happy', 'calm', 'excited', 'neutral', 'depressed', 'anxious', 'tired', 'angry']
 export const MAX_NOTE_LENGTH = 300
-export const MAX_REASON_IDS = 8
-export const MAX_REASON_LABEL_LENGTH = 8
+export const MAX_REASON_IDS = 10
+export const MAX_REASON_LABEL_LENGTH = 10
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MONTH_RE = /^\d{4}-\d{2}$/
 const REASON_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/
@@ -57,7 +57,7 @@ function normalizeReasonTag(value: unknown): ReasonTag {
   if (!value || typeof value !== 'object') throw new Error('백업에 올바르지 않은 이유 태그가 있습니다.')
   const tag = value as Partial<ReasonTag>
   if (typeof tag.id !== 'string' || !REASON_ID_RE.test(tag.id)
-    || typeof tag.label !== 'string' || !tag.label.trim() || tag.label.trim().length > MAX_REASON_LABEL_LENGTH
+    || typeof tag.label !== 'string' || !tag.label.trim() || [...tag.label.trim()].length > MAX_REASON_LABEL_LENGTH
     || typeof tag.active !== 'boolean' || typeof tag.built_in !== 'boolean'
     || typeof tag.created_at !== 'string' || Number.isNaN(Date.parse(tag.created_at))
     || typeof tag.updated_at !== 'string' || Number.isNaN(Date.parse(tag.updated_at))) {

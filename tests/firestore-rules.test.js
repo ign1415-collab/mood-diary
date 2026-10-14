@@ -107,9 +107,17 @@ describe('Firestore 사용자별 보안 규칙', () => {
     const alice = environment.authenticatedContext('alice').firestore()
     const custom = doc(alice, 'users/alice/reasonTags/custom-test')
     const now = Timestamp.now()
-    await assertSucceeds(setDoc(custom, { label: '운동', active: true, builtIn: false, createdAt: now, updatedAt: now }))
+    await assertSucceeds(setDoc(custom, { label: '가'.repeat(10), active: true, builtIn: false, createdAt: now, updatedAt: now }))
     await assertSucceeds(updateDoc(custom, { label: '헬스', updatedAt: Timestamp.now() }))
+    await assertFails(updateDoc(custom, { label: '가'.repeat(11), updatedAt: Timestamp.now() }))
     await assertSucceeds(updateDoc(custom, { active: false, updatedAt: Timestamp.now() }))
     await assertFails(deleteDoc(custom))
+  })
+
+  test('이유는 기록 하나에 최대 10개까지 저장할 수 있다', async () => {
+    const alice = environment.authenticatedContext('alice').firestore()
+    const ref = doc(alice, 'users/alice/diaries/main/entries/2026-10-09')
+    await assertSucceeds(setDoc(ref, entry({ reasonIds: Array.from({ length: 10 }, (_, index) => `tag-${index}`) })))
+    await assertFails(setDoc(ref, entry({ reasonIds: Array.from({ length: 11 }, (_, index) => `tag-${index}`) })))
   })
 })
