@@ -624,8 +624,10 @@ textarea::placeholder { color: var(--placeholder); }
   font-size: 11px; font-weight: 800; cursor: pointer;
 }
 .bottom-nav button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.bottom-nav button.active { color: var(--selected); }
-.bottom-nav button:hover { background: var(--control); }
+.bottom-nav button.active { color: var(--selected); background: var(--control); }
+@media (hover: hover) and (pointer: fine) {
+  .bottom-nav button:not(.active):hover { background: var(--control); }
+}
 .bottom-nav button:focus-visible { outline: 0; }
 .bottom-nav button:focus-visible span { text-decoration: underline; text-underline-offset: 3px; }
 

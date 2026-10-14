@@ -55,6 +55,22 @@ describe('계정 테마 선택', () => {
   })
 })
 
+describe('하단 메뉴 선택 상태', () => {
+  test('선택한 메뉴의 active 상태가 화면 전환 뒤에도 유지된다', async () => {
+    const user = userEvent.setup()
+    render(<App userId="qa-user" userEmail="qa@example.com" onSignOut={vi.fn()} todayOverride="2026-10-09" />)
+
+    const homeButton = screen.getByRole('button', { name: '홈' })
+    const analysisButton = screen.getByRole('button', { name: '분석' })
+    expect(homeButton).toHaveClass('active')
+    expect(analysisButton).not.toHaveClass('active')
+
+    await user.click(analysisButton)
+    expect(analysisButton).toHaveClass('active')
+    expect(homeButton).not.toHaveClass('active')
+  })
+})
+
 describe('느린 모바일 네트워크 저장', () => {
   test('PERF1 저장 응답 전에는 중복 클릭을 막고 응답 직후 월 전체 재조회 없이 버튼을 푼다', async () => {
     const pending = deferred<Entry>()
