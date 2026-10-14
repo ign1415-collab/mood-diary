@@ -84,7 +84,7 @@ describe('느린 모바일 네트워크 저장', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: '저장 중…' })).not.toBeInTheDocument())
     expect(apiMock.list).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '✓ 저장했어요' })).toBeEnabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: '✓ 저장했어요' })).toBeEnabled())
     expect(screen.getByLabelText('마음 기록')).toHaveValue('느린 네트워크 테스트')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })

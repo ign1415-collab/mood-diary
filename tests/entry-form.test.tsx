@@ -81,6 +81,7 @@ describe('날씨 저장 전달', () => {
       updated_at: timestamp,
     }
     const { onSave } = renderForm({ entry: existing })
+    await userEvent.click(screen.getByRole('button', { name: '수정하기' }))
     await userEvent.click(screen.getByRole('button', { name: '수정 내용 저장' }))
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ weather }))
   })
@@ -94,8 +95,37 @@ describe('날씨 저장 전달', () => {
       updated_at: timestamp,
     }
     const { onSave } = renderForm({ date: '2026-10-08', entry: existing })
+    await userEvent.click(screen.getByRole('button', { name: '수정하기' }))
     await userEvent.click(screen.getByRole('button', { name: '수정 내용 저장' }))
     expect(onSave.mock.calls[0][0]).not.toHaveProperty('weather')
+  })
+})
+
+describe('저장된 기록 수정 흐름', () => {
+  test('저장된 기록은 읽기 상태로 열리고 수정하기를 누르면 편집할 수 있다', async () => {
+    const user = userEvent.setup()
+    const existing: Entry = {
+      date: TODAY,
+      mood: 'neutral',
+      note: '저장된 마음',
+      reason_ids: ['sleep'],
+      created_at: timestamp,
+      updated_at: timestamp,
+    }
+    const { onSave } = renderForm({ entry: existing })
+
+    expect(screen.getByLabelText('마음 기록')).toHaveAttribute('readonly')
+    expect(screen.getByLabelText('보통')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '수정하기' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: '수정하기' }))
+    expect(screen.getByLabelText('마음 기록')).not.toHaveAttribute('readonly')
+    expect(screen.getByLabelText('보통')).toBeEnabled()
+
+    await user.clear(screen.getByLabelText('마음 기록'))
+    await user.type(screen.getByLabelText('마음 기록'), '바꾼 마음')
+    await user.click(screen.getByRole('button', { name: '수정 내용 저장' }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ note: '바꾼 마음' }))
   })
 })
 

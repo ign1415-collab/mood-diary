@@ -314,6 +314,11 @@ fieldset { border: 0; margin: 0; padding: 0; }
 .mood-choice strong { max-width: 100%; font-size: 13px; white-space: nowrap; }
 .mood-option:hover .mood-choice { border-color: var(--mood-color); }
 .mood-option input:checked + .mood-choice { color: var(--mood-text); background: var(--mood-soft); border-color: var(--mood-border, var(--mood-text)); }
+.entry-form-viewing .mood-option { cursor: default; }
+.entry-form-viewing .mood-option:hover .mood-choice { border-color: var(--control-border); }
+.entry-form-viewing .mood-option input:checked + .mood-choice { border-color: var(--mood-border, var(--mood-text)); }
+.entry-form-viewing textarea[readonly] { cursor: default; }
+.entry-form-viewing .reason-tag:disabled { opacity: 1; cursor: default; }
 .mood-error { margin: 9px 0 0; color: var(--teal); font-size: 12px; font-weight: 700; }
 .note-row { display: flex; align-items: baseline; justify-content: space-between; }
 .field-label { display: block; margin: 20px 0 9px; font-size: 15px; font-weight: 800; }

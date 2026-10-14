@@ -31,6 +31,7 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
   const [tagSaving, setTagSaving] = useState(false)
   const [moodError, setMoodError] = useState(false)
   const [saveComplete, setSaveComplete] = useState(false)
+  const [editing, setEditing] = useState(!entry)
 
   useEffect(() => {
     setMood(entry && isKnownMood(entry.mood) ? entry.mood : null)
@@ -44,7 +45,10 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
     setEditingLabel('')
     setReasonError('')
     setMoodError(false)
+    setEditing(!entry)
   }, [date, entry])
+
+  useEffect(() => setSaveComplete(false), [date])
 
   useEffect(() => {
     if (!saveComplete) return
@@ -57,6 +61,9 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
   }).format(new Date(`${date}T00:00:00Z`))
   const question = date === today ? '오늘의 마음은 어때요?' : '이날의 마음은 어땠어요?'
   const availableReasonTags = reasonTags.filter((tag) => tag.active || selectedReasonIds.includes(tag.id))
+  const displayedReasonTags = editing
+    ? availableReasonTags
+    : availableReasonTags.filter((tag) => selectedReasonIds.includes(tag.id))
 
   function toggleReason(id: string) {
     setSaveComplete(false)
@@ -190,7 +197,7 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
         </div>
       </div>
 
-      <form onSubmit={(event) => void handleSubmit(event)}>
+      <form className={editing ? 'entry-form-editing' : 'entry-form-viewing'} onSubmit={(event) => void handleSubmit(event)}>
         <fieldset>
           <legend className="visually-hidden">{question}</legend>
           <div className="mood-options">
@@ -199,7 +206,7 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
                 className={`mood-option mood-${key}`}
                 key={key}
               >
-                <input type="radio" name="mood" value={key} checked={mood === key} onChange={() => { setMood(key); setMoodError(false); setSaveComplete(false) }} />
+                <input type="radio" name="mood" value={key} checked={mood === key} disabled={!editing} onChange={() => { setMood(key); setMoodError(false); setSaveComplete(false) }} />
                 <span className="mood-choice">
                   <MoodIcon mood={key} size={28} />
                   <strong>{MOODS[key].label}</strong>
@@ -220,6 +227,7 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
           maxLength={MAX_NOTE_LENGTH}
           rows={3}
           spellCheck={false}
+          readOnly={!editing}
           onChange={(event) => { setNote(event.target.value); setSaveComplete(false) }}
           placeholder="어떤 하루였는지 들려주세요."
         />
@@ -229,30 +237,34 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
             type="button"
             className="reason-toggle"
             aria-expanded={reasonsOpen}
+            disabled={!editing && selectedReasonIds.length === 0}
             onClick={() => setReasonsOpen((open) => !open)}
           >
-            <span>{reasonsOpen ? '− 이유 접기' : '+ 이유 추가'}</span>
+            <span>{reasonsOpen ? '− 이유 접기' : editing ? '+ 이유 추가' : '이유 없음'}</span>
             <small>{selectedReasonIds.length ? `${selectedReasonIds.length}개 선택` : '선택 사항'}</small>
           </button>
           {reasonsOpen && (
             <div className="reason-panel">
               <div className="reason-tags" aria-label="기분의 이유">
-                {availableReasonTags.map((tag) => (
+                {displayedReasonTags.map((tag) => (
                   <button
                     type="button"
                     key={tag.id}
                     className={`reason-tag ${selectedReasonIds.includes(tag.id) ? 'selected' : ''}`}
                     aria-pressed={selectedReasonIds.includes(tag.id)}
+                    disabled={!editing}
                     onClick={() => toggleReason(tag.id)}
                   >
                     {tag.label}
                   </button>
                 ))}
               </div>
-              <div className="reason-tools">
-                <button type="button" onClick={() => { setCustomOpen((open) => !open); setManagingTags(false); setReasonError('') }}>+ 직접 추가</button>
-                <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>수정·숨기기</button>
-              </div>
+              {editing && (
+                <div className="reason-tools">
+                  <button type="button" onClick={() => { setCustomOpen((open) => !open); setManagingTags(false); setReasonError('') }}>+ 직접 추가</button>
+                  <button type="button" onClick={() => { setManagingTags((open) => !open); setCustomOpen(false); setReasonError('') }}>수정·숨기기</button>
+                </div>
+              )}
               {customOpen && (
                 <div className="reason-custom-form">
                   <input
@@ -323,7 +335,11 @@ export function EntryForm({ date, today, entry, weather, saving, reasonTags, onS
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="primary-button" disabled={saving}>{saving ? '저장 중…' : saveComplete ? '✓ 저장했어요' : entry ? '수정 내용 저장' : '저장하기'}</button>
+          {entry && !editing ? (
+            <button type="button" className="primary-button" onClick={() => { setEditing(true); setSaveComplete(false) }}>{saveComplete ? '✓ 저장했어요' : '수정하기'}</button>
+          ) : (
+            <button type="submit" className="primary-button" disabled={saving}>{saving ? '저장 중…' : entry ? '수정 내용 저장' : '저장하기'}</button>
+          )}
         </div>
       </form>
     </section>
